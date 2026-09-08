@@ -136,11 +136,11 @@ Paper Composer 是 Paper Library 内置的智能写作与研究侧栏。它与�
 ### 手动安装
 
 1. 从 [GitHub Releases](https://github.com/Lyle-xub/obsidian-paper-library/releases/latest) 下载 `paper-library-版本号.zip`。
-2. 解压后，把完整的 `paper-library` 文件夹放入 Vault 的 `.obsidian/plugins/`。
-3. 在「设置 → 第三方插件」中启用 **Paper Library**。
+2. 解压后，把完整的 `paper-library` 文件夹放到 `<你的 Vault>/.obsidian/plugins/paper-library/`；确认 `manifest.json` 位于这个目录，而不是多套一层文件夹。
+3. 重载 Obsidian，然后在「设置 → 第三方插件」中启用 **Paper Library**。
 4. 点击左侧 ribbon 的 Library 图标，或运行命令 `Open paper library`。
 
-首次安装完成后，打开「Paper Library 设置 → 插件更新」即可检查并一键安装后续版本。更新器会下载完整运行包，保留设置、论文数据、本地模型和缓存，并自动重新加载插件。
+从不含内置更新器的旧版本升级时，也需要按上面步骤手动覆盖一次完整文件夹。此后打开「Paper Library 设置 → 插件更新」即可检查并一键安装新版本；更新器会保留设置、论文数据、本地模型和缓存，并自动重新加载插件。
 
 ## 浏览器一键导入
 

@@ -6464,6 +6464,24 @@ body.paperlib-is-column-resizing {
   background: var(--background-modifier-hover);
 }
 
+.paperlib-editor-actions > button.mod-cta,
+.paperlib-modal-buttons > button.mod-cta {
+  color: #fff !important;
+  border-color: transparent !important;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--paperlib-global-accent, var(--interactive-accent)) 78%, #3157bb),
+    var(--paperlib-global-accent, var(--interactive-accent))
+  ) !important;
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--paperlib-global-accent, var(--interactive-accent)) 24%, transparent) !important;
+}
+
+.paperlib-editor-actions > button.mod-cta:hover:not(:disabled),
+.paperlib-modal-buttons > button.mod-cta:hover:not(:disabled) {
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+}
+
 .paperlib-relations {
   margin-top: 22px;
   padding-top: 20px;
