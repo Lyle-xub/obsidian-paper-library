@@ -2908,6 +2908,18 @@
   background: var(--background-modifier-hover);
 }
 
+.paperlib-appearance-base-standard .paperlib-icon-button {
+  color: var(--interactive-accent);
+  border-color: var(--paperlib-accent-border);
+  background: var(--paperlib-accent-soft);
+}
+
+.paperlib-appearance-base-standard .paperlib-icon-button:hover {
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+  background: var(--interactive-accent);
+}
+
 .paperlib-icon-button.is-active {
   color: var(--interactive-accent);
   background: var(--paperlib-accent-soft);
@@ -6440,8 +6452,9 @@ body.paperlib-is-column-resizing {
 
 .paperlib-editor-actions button:not(.mod-cta),
 .paperlib-modal-buttons > button:not(.mod-cta):not(.mod-warning) {
-  border-color: var(--background-modifier-border);
-  background: transparent;
+  color: var(--interactive-accent);
+  border-color: var(--paperlib-accent-border, color-mix(in srgb, var(--interactive-accent) 34%, transparent));
+  background: var(--paperlib-accent-soft, color-mix(in srgb, var(--interactive-accent) 10%, transparent));
   box-shadow: none;
 }
 
@@ -10330,6 +10343,30 @@ button.paperlib-file-open {
 .paperlib-settings .setting-item-control {
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.paperlib-settings button.paperlib-update-button {
+  min-height: 34px;
+  padding: 0 14px;
+  color: var(--text-normal);
+  border: 1px solid color-mix(in srgb, var(--paperlib-global-accent, #4b79f7) 32%, transparent) !important;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--paperlib-global-accent, #4b79f7) 9%, var(--background-primary)) !important;
+  box-shadow: none !important;
+  transition: transform 150ms ease, background-color 150ms ease, border-color 150ms ease;
+}
+
+.paperlib-settings button.paperlib-update-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--paperlib-global-accent, #4b79f7) 55%, transparent) !important;
+  background: color-mix(in srgb, var(--paperlib-global-accent, #4b79f7) 15%, var(--background-primary)) !important;
+}
+
+.paperlib-settings button.paperlib-update-button.is-primary {
+  color: #fff;
+  border-color: transparent !important;
+  background: linear-gradient(135deg, var(--paperlib-global-accent, #4b79f7), #6f5ce8) !important;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--paperlib-global-accent, #4b79f7) 22%, transparent) !important;
 }
 
 @media (max-width: 640px), (any-pointer: coarse) {

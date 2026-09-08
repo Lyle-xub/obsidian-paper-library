@@ -75,6 +75,70 @@ function isPaperLibraryMobile() {
   );
 }
 
+const PAPER_LIBRARY_RELEASES_API = "https://api.github.com/repos/Lyle-xub/obsidian-paper-library/releases/latest";
+const PAPER_LIBRARY_UPDATE_FILES = new Set([
+  "main.js",
+  "manifest.json",
+  "styles.css",
+  "versions.json",
+  "doclayout_extract.py",
+  "DOCLAYOUT_NOTICE.md",
+  "LICENSE"
+]);
+const PAPER_LIBRARY_UPDATE_REQUIRED_FILES = [
+  "main.js",
+  "manifest.json",
+  "styles.css",
+  "vendor/claudian.bundle.js",
+  "vendor/claudian.css",
+  "vendor/paper-composer-cli-providers.cjs",
+  "pipeline/worker.cjs",
+  "pipeline/models.json"
+];
+
+function normalizePaperLibraryReleaseVersion(value) {
+  return String(value || "").trim().replace(/^v/i, "").split("+")[0];
+}
+
+function comparePaperLibraryVersions(left, right) {
+  const parse = (value) => {
+    const [core, prerelease = ""] = normalizePaperLibraryReleaseVersion(value).split("-", 2);
+    return { numbers: core.split(".").map((part) => Number(part) || 0), prerelease };
+  };
+  const a = parse(left);
+  const b = parse(right);
+  const length = Math.max(a.numbers.length, b.numbers.length);
+  for (let index = 0; index < length; index += 1) {
+    const difference = (a.numbers[index] || 0) - (b.numbers[index] || 0);
+    if (difference) return difference > 0 ? 1 : -1;
+  }
+  if (a.prerelease === b.prerelease) return 0;
+  if (!a.prerelease) return 1;
+  if (!b.prerelease) return -1;
+  return a.prerelease.localeCompare(b.prerelease, undefined, { numeric: true });
+}
+
+function selectPaperLibraryReleaseAsset(release, version) {
+  const assets = Array.isArray(release?.assets) ? release.assets : [];
+  const exact = `paper-library-${normalizePaperLibraryReleaseVersion(version)}.zip`;
+  return assets.find((asset) => asset?.name === exact)
+    || assets.find((asset) => /^paper-library-(?!web-importer).*\.zip$/i.test(String(asset?.name || "")))
+    || null;
+}
+
+function isSafePaperLibraryZipEntry(value) {
+  const entry = String(value || "").replace(/\\/g, "/");
+  if (!entry || entry.includes("\0") || entry.startsWith("/") || /^[a-z]:\//i.test(entry)) return false;
+  return !entry.split("/").some((part) => part === "..");
+}
+
+function isPaperLibraryReleaseFile(value) {
+  const relativePath = String(value || "").replace(/\\/g, "/").replace(/^\.\//, "");
+  return PAPER_LIBRARY_UPDATE_FILES.has(relativePath)
+    || relativePath.startsWith("vendor/")
+    || relativePath.startsWith("pipeline/");
+}
+
 function itemViewContentRoot(view) {
   return view?.contentEl
     || view?.containerEl?.querySelector?.(":scope > .view-content")
@@ -8381,6 +8445,9 @@ class PaperLibrarySettingTab extends PluginSettingTab {
     this.composerSettingsDetails = null;
     this.composerSettingsHost = null;
     this.composerSettingsObserver = null;
+    this.updateBusy = false;
+    this.updateInfo = null;
+    this.updateMessage = "";
   }
 
   normalizeEmbeddedComposerSurface(root) {
@@ -8544,6 +8611,66 @@ class PaperLibrarySettingTab extends PluginSettingTab {
     });
   }
 
+  renderPluginUpdateSettings(containerEl) {
+    containerEl.createEl("h3", { text: "插件更新" });
+    const currentVersion = this.plugin.manifest?.version || "未知";
+    const description = this.plugin.isMobileApp()
+      ? `当前版本 ${currentVersion} · 自动更新仅支持桌面端。`
+      : this.updateMessage || `当前版本 ${currentVersion} · 更新时保留设置、论文数据、本地模型与缓存。`;
+    const setting = new Setting(containerEl)
+      .setName("检查 Paper Library 更新")
+      .setDesc(description)
+      .addButton((button) => {
+        button.buttonEl.addClass("paperlib-update-button");
+        button
+          .setButtonText(this.updateBusy ? "检查中…" : "检查更新")
+          .setDisabled(this.updateBusy || this.plugin.isMobileApp())
+          .onClick(async () => {
+            if (this.updateBusy) return;
+            this.updateBusy = true;
+            this.updateMessage = "正在检查 GitHub Release…";
+            this.display();
+            try {
+              this.updateInfo = await this.plugin.checkForPaperLibraryUpdate();
+              this.updateMessage = this.updateInfo.available
+                ? `发现 ${this.updateInfo.version}，可以直接下载并安装。`
+                : `当前已是最新版本 ${currentVersion}。`;
+            } catch (error) {
+              this.updateInfo = null;
+              this.updateMessage = `检查失败：${error?.message || error}`;
+            } finally {
+              this.updateBusy = false;
+              this.display();
+            }
+          });
+      });
+    if (this.updateInfo?.available && !this.plugin.isMobileApp()) {
+      setting.addButton((button) => {
+        button.buttonEl.addClass("paperlib-update-button");
+        button.buttonEl.addClass("is-primary");
+        button
+          .setButtonText(this.updateBusy ? "更新中…" : `更新到 ${this.updateInfo.version}`)
+          .setDisabled(this.updateBusy)
+          .onClick(async () => {
+            if (this.updateBusy) return;
+            this.updateBusy = true;
+            this.updateMessage = `正在下载 ${this.updateInfo.version}…`;
+            this.display();
+            try {
+              await this.plugin.installPaperLibraryUpdate(this.updateInfo, (message) => {
+                this.updateMessage = message;
+                this.display();
+              });
+            } catch (error) {
+              this.updateBusy = false;
+              this.updateMessage = `更新失败，原版本已保留：${error?.message || error}`;
+              this.display();
+            }
+          });
+      });
+    }
+  }
+
   display() {
     this.composerSettingsObserver?.disconnect?.();
     this.composerSettingsObserver = null;
@@ -8551,6 +8678,7 @@ class PaperLibrarySettingTab extends PluginSettingTab {
     containerEl.empty();
     containerEl.addClass("paperlib-settings");
     containerEl.createEl("h2", { text: "Paper Library" });
+    this.renderPluginUpdateSettings(containerEl);
     containerEl.createEl("h3", { text: "外观" });
     const customProfiles = this.plugin.getCustomAppearanceProfiles();
     new Setting(containerEl)
@@ -9094,6 +9222,14 @@ module.exports = class PaperLibraryPlugin extends Plugin {
     formatCitationAuthors
   };
 
+  static updateInternals = {
+    normalizePaperLibraryReleaseVersion,
+    comparePaperLibraryVersions,
+    selectPaperLibraryReleaseAsset,
+    isSafePaperLibraryZipEntry,
+    isPaperLibraryReleaseFile
+  };
+
   removeLegacyComposerSettingTabs() {
     const setting = this.app.setting;
     if (!setting || !Array.isArray(setting.pluginTabs) || typeof setting.removeSettingTab !== "function") return;
@@ -9133,6 +9269,181 @@ module.exports = class PaperLibraryPlugin extends Plugin {
     targets.forEach((element) => setPaperlibIcon(element, PAPER_COMPOSER_ICON));
   }
 
+  async checkForPaperLibraryUpdate() {
+    if (this.isMobileApp()) throw new Error("自动更新仅支持桌面端 Obsidian");
+    const response = await requestUrl({
+      url: PAPER_LIBRARY_RELEASES_API,
+      method: "GET",
+      headers: {
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+      },
+      throw: false
+    });
+    if (response.status >= 400) throw new Error(`GitHub 请求失败（HTTP ${response.status}）`);
+    const release = response?.json || (response?.text ? JSON.parse(response.text) : {});
+    const version = normalizePaperLibraryReleaseVersion(release?.tag_name);
+    if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) throw new Error("最新版本号无效");
+    const asset = selectPaperLibraryReleaseAsset(release, version);
+    if (!asset?.browser_download_url) throw new Error(`版本 ${version} 缺少完整安装包`);
+    return {
+      version,
+      available: comparePaperLibraryVersions(version, this.manifest?.version) > 0,
+      assetUrl: asset.browser_download_url,
+      assetName: asset.name,
+      digest: String(asset.digest || ""),
+      releaseUrl: String(release?.html_url || "")
+    };
+  }
+
+  async listPaperLibraryZipEntries(zipPath) {
+    if (process.platform === "win32") {
+      const script = "[IO.Compression.ZipFile]::OpenRead($args[0]).Entries | ForEach-Object { $_.FullName }";
+      const result = await this.runDesktopProcess("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script, zipPath], { timeout: 60 * 1000 });
+      return result.stdout.split(/\r?\n/).map((entry) => entry.trim()).filter(Boolean);
+    }
+    const result = await this.runDesktopProcess("unzip", ["-Z1", zipPath], { timeout: 60 * 1000 });
+    return result.stdout.split(/\r?\n/).map((entry) => entry.trim()).filter(Boolean);
+  }
+
+  async extractPaperLibraryUpdate(zipPath, destination) {
+    if (process.platform === "win32") {
+      const script = "Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force";
+      await this.runDesktopProcess("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script, zipPath, destination], { timeout: 2 * 60 * 1000 });
+      return;
+    }
+    await this.runDesktopProcess("unzip", ["-q", zipPath, "-d", destination], { timeout: 2 * 60 * 1000 });
+  }
+
+  async collectPaperLibraryUpdateFiles(root) {
+    const fs = require("node:fs");
+    const nodePath = require("node:path");
+    const files = [];
+    const walk = async (directory, relativeDirectory = "") => {
+      for (const entry of await fs.promises.readdir(directory, { withFileTypes: true })) {
+        if (entry.isSymbolicLink()) throw new Error("安装包包含不允许的符号链接");
+        const relativePath = relativeDirectory ? `${relativeDirectory}/${entry.name}` : entry.name;
+        const absolutePath = nodePath.join(directory, entry.name);
+        if (entry.isDirectory()) await walk(absolutePath, relativePath);
+        else if (entry.isFile() && isPaperLibraryReleaseFile(relativePath)) files.push(relativePath);
+      }
+    };
+    await walk(root);
+    return files;
+  }
+
+  async installPaperLibraryUpdate(update, onProgress = () => {}) {
+    if (this.isMobileApp()) throw new Error("自动更新仅支持桌面端 Obsidian");
+    if (this.paperLibraryUpdatePromise) return this.paperLibraryUpdatePromise;
+    this.paperLibraryUpdatePromise = (async () => {
+      const fs = require("node:fs");
+      const nodePath = require("node:path");
+      const os = require("node:os");
+      const crypto = require("node:crypto");
+      const currentVersion = this.manifest?.version || "0.0.0";
+      if (!update?.assetUrl || comparePaperLibraryVersions(update.version, currentVersion) <= 0) {
+        throw new Error("没有可安装的新版本");
+      }
+      onProgress(`正在下载 ${update.version}…`);
+      const response = await requestUrl({
+        url: update.assetUrl,
+        method: "GET",
+        headers: { Accept: "application/octet-stream" },
+        throw: false
+      });
+      if (response.status >= 400 || !response.arrayBuffer) throw new Error(`安装包下载失败（HTTP ${response.status || "未知"}）`);
+      const archive = Buffer.from(response.arrayBuffer);
+      if (update.digest?.startsWith("sha256:")) {
+        const digest = `sha256:${crypto.createHash("sha256").update(archive).digest("hex")}`;
+        if (digest !== update.digest.toLocaleLowerCase()) throw new Error("安装包完整性校验失败");
+      }
+      const temporaryRoot = await fs.promises.mkdtemp(nodePath.join(os.tmpdir(), "paper-library-update-"));
+      const archivePath = nodePath.join(temporaryRoot, update.assetName || "paper-library.zip");
+      const extractionPath = nodePath.join(temporaryRoot, "extracted");
+      const backupPath = nodePath.join(temporaryRoot, "backup");
+      const applied = [];
+      try {
+        await fs.promises.writeFile(archivePath, archive);
+        const entries = await this.listPaperLibraryZipEntries(archivePath);
+        if (!entries.length || entries.some((entry) => !isSafePaperLibraryZipEntry(entry))) {
+          throw new Error("安装包路径校验失败");
+        }
+        const manifests = entries.filter((entry) => /(^|\/)manifest\.json$/.test(entry));
+        if (manifests.length !== 1) throw new Error("安装包目录结构无效");
+        await fs.promises.mkdir(extractionPath, { recursive: true });
+        await this.extractPaperLibraryUpdate(archivePath, extractionPath);
+        const packageDirectory = nodePath.join(extractionPath, nodePath.dirname(manifests[0]));
+        const manifest = JSON.parse(await fs.promises.readFile(nodePath.join(packageDirectory, "manifest.json"), "utf8"));
+        if (manifest.id !== this.manifest.id) throw new Error("安装包不属于 Paper Library");
+        if (normalizePaperLibraryReleaseVersion(manifest.version) !== normalizePaperLibraryReleaseVersion(update.version)) {
+          throw new Error("安装包版本与发布版本不一致");
+        }
+        const files = await this.collectPaperLibraryUpdateFiles(packageDirectory);
+        const missing = PAPER_LIBRARY_UPDATE_REQUIRED_FILES.filter((file) => !files.includes(file));
+        if (missing.length) throw new Error(`安装包缺少运行文件：${missing.join("、")}`);
+        const pluginDirectory = this.getDesktopPluginPath();
+        await fs.promises.mkdir(backupPath, { recursive: true });
+        onProgress(`正在安装 ${update.version}…`);
+        const orderedFiles = files.sort((left, right) => {
+          const priority = (file) => file === "manifest.json" ? 3 : file === "main.js" ? 2 : file === "styles.css" ? 1 : 0;
+          return priority(left) - priority(right) || left.localeCompare(right);
+        });
+        for (const relativePath of orderedFiles) {
+          const source = nodePath.join(packageDirectory, relativePath);
+          const destination = nodePath.join(pluginDirectory, relativePath);
+          const backup = nodePath.join(backupPath, relativePath);
+          const existed = fs.existsSync(destination);
+          if (existed) {
+            const stat = await fs.promises.lstat(destination);
+            if (!stat.isFile()) throw new Error(`无法替换非文件路径：${relativePath}`);
+            await fs.promises.mkdir(nodePath.dirname(backup), { recursive: true });
+            await fs.promises.copyFile(destination, backup);
+          }
+          await fs.promises.mkdir(nodePath.dirname(destination), { recursive: true });
+          const pending = `${destination}.paper-library-update`;
+          await fs.promises.copyFile(source, pending);
+          try {
+            await fs.promises.rename(pending, destination);
+          } catch (error) {
+            if (!existed || !["EEXIST", "EPERM", "EACCES"].includes(error?.code)) throw error;
+            await fs.promises.copyFile(pending, destination);
+            await fs.promises.rm(pending, { force: true });
+          }
+          applied.push({ relativePath, destination, backup, existed });
+        }
+        onProgress(`已更新到 ${update.version}，正在重新加载插件…`);
+      } catch (error) {
+        for (const file of applied.reverse()) {
+          try {
+            if (file.existed) await fs.promises.copyFile(file.backup, file.destination);
+            else await fs.promises.rm(file.destination, { force: true });
+          } catch (_) {}
+        }
+        throw error;
+      } finally {
+        await fs.promises.rm(temporaryRoot, { recursive: true, force: true }).catch(() => {});
+      }
+      const app = this.app;
+      const pluginId = this.manifest.id;
+      new Notice(`Paper Library 已更新到 ${update.version}`);
+      window.setTimeout(async () => {
+        try {
+          await app.plugins.disablePlugin(pluginId);
+          await app.plugins.enablePlugin(pluginId);
+          new Notice("Paper Library 已重新加载");
+        } catch (error) {
+          console.error("Paper Library: automatic reload failed", error);
+          new Notice("更新已安装，请重启 Obsidian 以载入新版本", 8000);
+        }
+      }, 400);
+    })();
+    try {
+      return await this.paperLibraryUpdatePromise;
+    } finally {
+      this.paperLibraryUpdatePromise = null;
+    }
+  }
+
   async onload() {
     this.removeLegacyComposerSettingTabs();
     this.registerPaperComposerIcon();
@@ -9147,6 +9458,7 @@ module.exports = class PaperLibraryPlugin extends Plugin {
     this.claudianRuntime = null;
     this.claudianSettingTab = null;
     this.paperLibrarySettingTab = null;
+    this.paperLibraryUpdatePromise = null;
     this.claudianStyleEl = null;
     this.claudianLoadError = null;
     this.composerPdfTabs = new Set();
@@ -17610,7 +17922,10 @@ module.exports = class PaperLibraryPlugin extends Plugin {
     let info = {};
     let xmp = {};
     let text = "";
+    let readingText = "";
     const visualPages = [];
+    const pageTexts = [];
+    const readingPageTexts = [];
     let pdfDocument = null;
     try {
       const pdfjs = await loadPdfJs();
@@ -17623,7 +17938,6 @@ module.exports = class PaperLibraryPlugin extends Plugin {
       } catch (_) {
         // Some valid PDFs do not expose a readable metadata dictionary.
       }
-      const pageTexts = [];
       const pageCount = Math.min(pdfDocument.numPages || 0, 2);
       for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
         const page = await pdfDocument.getPage(pageNumber);
@@ -17631,16 +17945,18 @@ module.exports = class PaperLibraryPlugin extends Plugin {
         const visualLines = this.pdfTextLines(content.items || []);
         visualPages.push(visualLines);
         let pageText = visualLines.map((line) => line.text).join("\n");
-        if (!pageText.trim()) {
-          content.items.forEach((item) => {
-            if (!item?.str) return;
-            pageText += item.str;
-            pageText += item.hasEOL ? "\n" : " ";
-          });
-        }
+        let readingPageText = "";
+        content.items.forEach((item) => {
+          if (!item?.str) return;
+          readingPageText += item.str;
+          readingPageText += item.hasEOL ? "\n" : " ";
+        });
+        if (!pageText.trim()) pageText = readingPageText;
         pageTexts.push(pageText);
+        readingPageTexts.push(readingPageText);
       }
       text = pageTexts.join("\n").replace(/\u0000/g, " ");
+      readingText = readingPageTexts.join("\n").replace(/\u0000/g, " ");
     } catch (error) {
       console.warn("Paper Library: local PDF metadata extraction failed", error);
     } finally {
@@ -17648,7 +17964,7 @@ module.exports = class PaperLibraryPlugin extends Plugin {
     }
 
     const metadataText = JSON.stringify({ info, xmp });
-    const searchable = `${metadataText}\n${text}`;
+    const searchable = `${metadataText}\n${text}\n${readingText}`;
     const doiMatch = searchable.match(/\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+/i);
     const doi = doiMatch ? doiMatch[0].replace(/[\s)>\].,;:]+$/g, "") : "";
     const arxivMatch = searchable.match(/\barXiv\s*:\s*(\d{4}\.\d{4,5})(?:v\d+)?/i)
@@ -17663,7 +17979,7 @@ module.exports = class PaperLibraryPlugin extends Plugin {
       .flatMap((value) => splitMetadataAuthors(value));
     const authors = embeddedAuthors.length
       ? [...new Set(embeddedAuthors)]
-      : this.extractAuthorsFromPdfText(text, title);
+      : this.extractAuthorsFromPdfText(readingText || text, title);
     const keywords = stripMarkup(info.Keywords || xmp["pdf:keywords"] || "")
       .split(/[,;]+/)
       .map((value) => value.trim())
@@ -17677,10 +17993,8 @@ module.exports = class PaperLibraryPlugin extends Plugin {
       title,
       authors,
       year,
-      venue: this.guessVenueFromPdfText(text),
-      // Abstracts come from Semantic Scholar. PDF text order is not reliable
-      // enough to distinguish an abstract from adjacent body columns.
-      abstract: "",
+      venue: this.guessVenueFromPdfText(pageTexts[0] || readingPageTexts[0] || text),
+      abstract: this.extractAbstractFromPdfText(readingText || text),
       tags: normalizePaperTags(keywords),
       doi,
       arxiv
@@ -17847,7 +18161,40 @@ module.exports = class PaperLibraryPlugin extends Plugin {
     const lines = String(text || "").split(/\n+/).slice(0, 50)
       .map((line) => line.replace(/\s+/g, " ").trim())
       .filter(Boolean);
-    if (!lines.length || !hasCjkText(`${title}\n${lines.slice(0, 12).join("\n")}`)) return [];
+    if (!lines.length) return [];
+    if (!hasCjkText(`${title}\n${lines.slice(0, 12).join("\n")}`)) {
+      const boundary = lines.findIndex((line) => /^(?:abstract|keywords?|index terms|(?:\d+(?:\.\d+)*)?\s*introduction)\b/i.test(line));
+      if (boundary < 1) return [];
+      const normalizedTitle = normalizeTitleForMatch(title);
+      const affiliationPattern = /(?:university|college|institute|school|department|laborator(?:y|ies)|research (?:center|centre)|academy|hospital|corporation|company|inc\.?|ltd\.?|llc)\b|@/i;
+      const authors = [];
+      for (let index = boundary - 1; index >= Math.max(0, boundary - 24); index -= 1) {
+        const line = lines[index];
+        const normalizedLine = normalizeTitleForMatch(line);
+        if (normalizedLine && normalizedTitle.includes(normalizedLine)) {
+          if (authors.length) break;
+          continue;
+        }
+        if (/^\d/.test(line) || affiliationPattern.test(line)) continue;
+        const separated = line
+          .replace(/\d+(?:\s*,\s*\d+)*(?:\s*[*＊†‡¹²³⁴⁵⁶⁷⁸⁹⁰]+)?/gu, ";")
+          .replace(/[*＊†‡¹²³⁴⁵⁶⁷⁸⁹⁰]+/gu, ";")
+          .replace(/\s+(?:and|&)\s+/gi, ";")
+          .replace(/[•·]+/g, ";");
+        const pieces = (separated.includes(";") ? separated.split(";") : separated.split(/\s*,\s*/))
+          .map((name) => name.replace(/^authors?\s*[:：]\s*/i, "").replace(/^[\s,;:()[\]]+|[\s,;:()[\]]+$/g, "").trim())
+          .filter(Boolean);
+        const names = pieces.filter((name) => {
+          if (affiliationPattern.test(name) || name.length > 80) return false;
+          const words = name.split(/\s+/).filter(Boolean);
+          if (words.length < 2 || words.length > 5) return false;
+          return words.every((word) => /^(?:[\p{Lu}][\p{L}'’.-]*|[\p{Lu}]\.|de|del|di|da|dos|van|von|la|le)$/u.test(word));
+        });
+        if (names.length) authors.unshift(...names);
+        else if (authors.length) break;
+      }
+      return [...new Set(authors)].slice(0, 40);
+    }
     let titleIndex = -1;
     let bestTitleScore = 0;
     lines.slice(0, 30).forEach((line, index) => {
@@ -17876,17 +18223,32 @@ module.exports = class PaperLibraryPlugin extends Plugin {
     return [...new Set(authors)].slice(0, 20);
   }
 
-  guessVenueFromPdfText(text) {
-    const value = String(text || "").replace(/\s+/g, " ");
-    const neuralInformationProcessing = value.match(
-      /\bConference on Neural Information Processing Systems\s*\(\s*(NIPS|NeurIPS)\s*(?:19|20)?\d{2}\s*\)/i
-    );
-    if (neuralInformationProcessing) {
-      return neuralInformationProcessing[1].toLocaleLowerCase() === "neurips" ? "NeurIPS" : "NIPS";
+  extractAbstractFromPdfText(text) {
+    const lines = String(text || "").replace(/\u0000/g, " ").split(/\n+/)
+      .map((line) => line.replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    const start = lines.findIndex((line) => /^abstract\b/i.test(line));
+    if (start < 0) return "";
+    const inline = lines[start].replace(/^abstract\s*[:：—–-]?\s*/i, "").trim();
+    const parts = inline ? [inline] : [];
+    for (const line of lines.slice(start + 1)) {
+      if (/^(?:keywords?|index terms)\s*[:：]?\b/i.test(line)) break;
+      if (/^(?:\d+(?:\.\d+)*)\s+(?:introduction|background|related work|methods?|methodology)\b/i.test(line)) break;
+      if (/^(?:introduction|background|related work|methods?|methodology)$/i.test(line)) break;
+      parts.push(line);
+      if (parts.join(" ").length >= 6000) break;
     }
-    const abbreviation = value.match(/\b(NeurIPS|NIPS)\s*(?:19|20)\d{2}\b/i);
-    if (!abbreviation) return "";
-    return abbreviation[1].toLocaleLowerCase() === "neurips" ? "NeurIPS" : "NIPS";
+    const abstract = parts.join(" ")
+      .replace(/([\p{L}])-\s+([\p{Ll}])/gu, "$1$2")
+      .replace(/\s+/g, " ")
+      .trim();
+    return abstract.length >= 80 ? abstract.slice(0, 6000) : "";
+  }
+
+  guessVenueFromPdfText(text) {
+    const value = String(text || "").replace(/\s+/g, " ").trim();
+    const rule = this.findConferenceRankingRule(value) || findVenueRankingRule(value);
+    return rule?.kind === "conference" ? rule.shortName : "";
   }
 
   paperMetadataMissingFields(metadata) {
@@ -20175,8 +20537,7 @@ module.exports = class PaperLibraryPlugin extends Plugin {
         try {
           const buffer = await this.app.vault.readBinary(pdfFile);
           local = {
-            ...(await this.extractLocalPdfMetadata(buffer, paper.originalPdfName || pdfFile.name)),
-            abstract: ""
+            ...(await this.extractLocalPdfMetadata(buffer, paper.originalPdfName || pdfFile.name))
           };
           if (!this.isMobileApp() && this.isDocLayoutRuntimeInstalled()) {
             const confirmation = await this.confirmPaperTitleWithDocLayout(paper, local);

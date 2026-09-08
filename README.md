@@ -133,15 +133,14 @@ Paper Composer 是 Paper Library 内置的智能写作与研究侧栏。它与�
 
 ## 安装
 
-### 通过 BRAT 安装
+### 手动安装
 
-1. 在 Obsidian 的「设置 → 第三方插件 → 浏览」中安装并启用 [BRAT](https://github.com/TfTHacker/obsidian42-brat)。
-2. 打开命令面板，运行 `BRAT: Add a beta plugin for testing`。
-3. 粘贴仓库地址：`https://github.com/Lyle-xub/obsidian-paper-library`。
-4. BRAT 安装完成后，在「设置 → 第三方插件」中启用 **Paper Library**。
-5. 点击左侧 ribbon 的 Library 图标，或运行命令 `Open paper library`。
+1. 从 [GitHub Releases](https://github.com/Lyle-xub/obsidian-paper-library/releases/latest) 下载 `paper-library-版本号.zip`。
+2. 解压后，把完整的 `paper-library` 文件夹放入 Vault 的 `.obsidian/plugins/`。
+3. 在「设置 → 第三方插件」中启用 **Paper Library**。
+4. 点击左侧 ribbon 的 Library 图标，或运行命令 `Open paper library`。
 
-后续版本可直接通过 BRAT 检查并安装更新。
+首次安装完成后，打开「Paper Library 设置 → 插件更新」即可检查并一键安装后续版本。更新器会下载完整运行包，保留设置、论文数据、本地模型和缓存，并自动重新加载插件。
 
 ## 浏览器一键导入
 
