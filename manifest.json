@@ -1,7 +1,7 @@
 {
   "id": "paper-library",
   "name": "Paper Library",
-  "version": "0.42.1",
+  "version": "0.42.2",
   "minAppVersion": "1.5.0",
   "description": "A paper library and visual active-reading workspace for Obsidian.",
   "author": "Lyle",
