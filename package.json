@@ -1,0 +1,14 @@
+{
+  "name": "obsidian-paper-library",
+  "version": "0.41.0",
+  "private": true,
+  "description": "Paper manager and visual active-reading workspace for Obsidian",
+  "main": "main.js",
+  "scripts": {
+    "build": "node build.js",
+    "check": "node --check main.js && node --check pipeline/worker.cjs && node --check vendor/claudian.bundle.js && node --check vendor/paper-composer-cli-providers.cjs && node --check test/highlight.test.js && python3 -c \"import ast,pathlib; ast.parse(pathlib.Path('doclayout_extract.py').read_text())\"",
+    "test": "node test/citation-engine.test.js && node test/claudian-integration.test.js && node test/pdf-ai-modes.test.js && node test/pdf-mark-sync.test.js"
+  },
+  "keywords": ["obsidian", "papers", "research", "library"],
+  "license": "MIT"
+}

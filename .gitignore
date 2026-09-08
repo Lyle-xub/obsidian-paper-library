@@ -1,0 +1,11 @@
+.DS_Store
+data.json
+.doclayout-cache/
+.doclayout-runtime/
+figure-cache/
+metadata-cache/
+models/
+pipeline-runtime/
+pipeline-cache/
+*.zip
+node_modules/

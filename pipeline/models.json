@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 2,
+  "pipeline": "mineru-compatible-no-torch-v2",
+  "runtimeOrder": ["layout", "formula", "ocr", "table", "markdown"],
+  "runtime": {
+    "kind": "node-onnxruntime",
+    "paddleOcrJsVersion": "1.2.0",
+    "onnxRuntimeVersion": "1.22.0-rev",
+    "onnxRuntimeCommonVersion": "1.22.0",
+    "marker": "pipeline-runtime/install.json"
+  },
+  "policies": {
+    "shipPyTorch": false,
+    "shipPaddlePython": false,
+    "allowPdfJsFallback": false,
+    "fallbackToSourceFile": true,
+    "quantized": false,
+    "weights": "fp32",
+    "downloadPerPlatform": true
+  },
+  "models": [
+    {
+      "id": "layout-pp-doclayout-v2",
+      "stage": "layout",
+      "upstream": "PP-DocLayoutV2",
+      "runtime": "onnxruntime",
+      "format": "onnx",
+      "artifacts": [
+        { "path": "layout/PP-DocLayoutV2.onnx", "url": "https://huggingface.co/alex-dinh/PP-DocLayoutV2-ONNX/resolve/main/PP-DocLayoutV2.onnx?download=true", "size": 213963712, "sha256": "2009fcb35e64085ab9f6f2b27aca550edc29a040a24f7d6a0f05b74a2f804860" },
+        { "path": "layout/config.json", "url": "https://huggingface.co/alex-dinh/PP-DocLayoutV2-ONNX/resolve/main/config.json?download=true", "size": 4535, "sha256": "e1a25a0cbdc59c3668bc96467ecca6b9747eca29ff26d90282f452adc89df21f" }
+      ]
+    },
+    {
+      "id": "ocr-pp-ocrv6-small-det-ch",
+      "stage": "ocr",
+      "upstream": "ch_PP-OCRv6_small_det_infer",
+      "runtime": "onnxruntime",
+      "format": "onnx",
+      "artifacts": [
+        { "path": "ocr/ch_PP-OCRv6_small_det_infer.onnx", "url": "https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det_onnx/resolve/main/inference.onnx?download=true", "size": 9880512, "sha256": "d73e0058b7a8086bbd57f3d10b8bcd4ff95363f67e06e2762b5e814fe9c9410e" }
+      ]
+    },
+    {
+      "id": "ocr-pp-ocrv6-small-rec-ch",
+      "stage": "ocr",
+      "upstream": "ch_PP-OCRv6_small_rec_infer",
+      "runtime": "onnxruntime",
+      "format": "onnx",
+      "artifacts": [
+        { "path": "ocr/ch_PP-OCRv6_small_rec_infer.onnx", "url": "https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec_onnx/resolve/main/inference.onnx?download=true", "size": 21159378, "sha256": "5435fd747c9e0efe15a96d0b378d5bd157e9492ed8fd80edf08f30d02fa24634" },
+        { "path": "ocr/ppocrv6_dict.txt", "url": "https://huggingface.co/X3ZvaWQ/paddleocr-js-onnx/resolve/main/ppocr_v6_small/ppocrv6_dict.txt?download=true", "size": 74947, "sha256": "b5f2bfe2bdd9448429e3e82b51c789775d9b42f2403d082b00662eb77e401c5d" }
+      ]
+    },
+    {
+      "id": "table-slanet-plus",
+      "stage": "table",
+      "upstream": "SLANet-plus",
+      "runtime": "onnxruntime",
+      "format": "onnx",
+      "artifacts": [
+        { "path": "table/slanet-plus.onnx", "url": "https://huggingface.co/PaddlePaddle/SLANet_plus_onnx/resolve/main/inference.onnx?download=true", "size": 7782138, "sha256": "7790c0c13ce064782c9d22ebeb16b4da8216f83d3ba576da962c106ef58386da" }
+      ]
+    },
+    {
+      "id": "table-unet-structure",
+      "stage": "table",
+      "upstream": "UnetStructure",
+      "runtime": "onnxruntime",
+      "format": "onnx",
+      "artifacts": [
+        { "path": "table/unet-structure.onnx", "url": "https://huggingface.co/opendatalab/PDF-Extract-Kit-1.0/resolve/main/models/TabRec/UnetStructure/unet.onnx?download=true", "size": 8335007, "sha256": "0ea48d3a17e35ef5c2e498a5e799566073234d39b1079ca21d9f4fafe73c6d20" }
+      ]
+    },
+    {
+      "id": "table-pp-lcnet-classifier",
+      "stage": "table",
+      "upstream": "PP-LCNet_table_cls",
+      "runtime": "onnxruntime",
+      "format": "onnx",
+      "artifacts": [
+        { "path": "table/pp-lcnet-table-cls.onnx", "url": "https://huggingface.co/PaddlePaddle/PP-LCNet_x1_0_table_cls_onnx/resolve/main/inference.onnx?download=true", "size": 6777817, "sha256": "f8e4cb1b58a29bebd36852edcb238b53e0acefa75116a8a4db443f13dbc72b0b" }
+      ]
+    },
+    {
+      "id": "formula-pp-formulanet-plus-m",
+      "stage": "formula",
+      "upstream": "PP-FormulaNet_plus-M",
+      "runtime": "onnxruntime",
+      "format": "onnx",
+      "artifacts": [
+        { "path": "formula/PP-FormulaNet-plus-M/inference.onnx", "url": "https://huggingface.co/X3ZvaWQ/paddleocr-js-onnx/resolve/main/pp_formulanet_plus_m/PP-FormulaNet_plus-M_infer.onnx?download=true", "size": 720108704, "sha256": "e3f2cfc3ee4ac4619a99a95e9bf9ea4ec239f4a9139dff746a4a43b1945920b0" },
+        { "path": "formula/PP-FormulaNet-plus-M/config.json", "url": "https://huggingface.co/X3ZvaWQ/paddleocr-js-onnx/resolve/main/pp_formulanet_plus_m/config.json?download=true", "size": 3951676, "sha256": "aaa40c3c54b25b157c46f937043f2223874f01fc7e2060f3d1d5d08ffb9bc12f" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Paper Library Web Importer",
+  "version": "2.1.0",
+  "description": "从论文网页或浏览器 PDF 阅读器一键下载全文并导入 Obsidian Paper Library。",
+  "permissions": ["storage", "tabs", "activeTab", "scripting", "downloads"],
+  "host_permissions": [
+    "<all_urls>",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["detector.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

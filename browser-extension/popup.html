@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Paper Library Web Importer</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header class="header">
+    <span class="logo" aria-hidden="true">P</span>
+    <div>
+      <h1>Paper Library</h1>
+      <p>浏览器中的轻量论文助手</p>
+    </div>
+    <span id="library-badge" class="library-badge hidden">已收藏</span>
+  </header>
+
+  <main id="main">
+    <section id="paper-card" class="card hidden">
+      <div id="paper-title" class="paper-title"></div>
+      <div id="paper-authors" class="paper-authors"></div>
+      <div id="paper-meta" class="paper-meta"></div>
+      <div id="access-state" class="access-state"></div>
+    </section>
+
+    <section id="empty-card" class="card hidden">
+      <strong>未识别到论文</strong>
+      <p class="empty-text">请打开论文详情页、出版社全文页或浏览器中的 PDF 后重试。</p>
+    </section>
+
+    <section id="lookup-skeleton" class="library-panel skeleton-panel hidden" aria-label="正在查询本地论文库">
+      <div class="skeleton skeleton-wide"></div>
+      <div class="metric-skeletons">
+        <div class="skeleton"></div><div class="skeleton"></div>
+        <div class="skeleton"></div><div class="skeleton"></div>
+      </div>
+    </section>
+
+    <section id="library-card" class="library-panel hidden">
+      <div class="library-heading">
+        <div>
+          <span class="eyebrow">IN YOUR LIBRARY</span>
+          <div id="local-venue" class="local-venue"></div>
+        </div>
+        <span class="library-check" aria-hidden="true">✓</span>
+      </div>
+      <div id="local-ranks" class="rank-list"></div>
+      <div class="metric-grid">
+        <div class="metric-item"><strong id="metric-citations">—</strong><span>引用</span></div>
+        <div class="metric-item"><strong id="metric-references">—</strong><span>参考文献</span></div>
+        <div class="metric-item"><strong id="metric-year">—</strong><span>年份</span></div>
+        <div class="metric-item"><strong id="metric-type">—</strong><span>文献类型</span></div>
+      </div>
+      <div id="local-stars" class="local-stars hidden"></div>
+      <div id="local-labels" class="local-labels"></div>
+      <div id="metrics-source" class="metrics-source"></div>
+    </section>
+
+    <div id="status" class="status hidden"></div>
+
+    <div id="import-actions" class="actions">
+      <button id="import-pdf-btn" class="primary" disabled>
+        <span>下载 PDF 并导入</span>
+      </button>
+      <button id="metadata-btn" class="secondary">仅导入文献信息</button>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <button id="settings-toggle" class="link" aria-expanded="false">连接设置</button>
+    <span id="conn-state" class="conn-state">正在检测…</span>
+  </footer>
+
+  <section id="settings-panel" class="card hidden">
+    <label class="field">
+      <span>访问令牌（Token）</span>
+      <input id="token-input" type="password" placeholder="在 Obsidian 设置中复制" autocomplete="off" />
+    </label>
+    <label class="field">
+      <span>端口</span>
+      <input id="port-input" type="number" min="1024" max="65535" placeholder="23987" />
+    </label>
+    <div class="actions">
+      <button id="save-config-btn" class="secondary">保存</button>
+      <button id="test-btn" class="secondary">测试连接</button>
+    </div>
+    <p class="hint">
+      在 Obsidian → 设置 → Paper Library → 浏览器扩展 中启用服务并复制 Token。Token 只用于本机连接。
+    </p>
+  </section>
+
+  <script src="popup.js"></script>
+</body>
+</html>

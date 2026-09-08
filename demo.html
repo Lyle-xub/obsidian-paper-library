@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Paper Library Preview</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    :root {
+      --background-primary:#fbfcfd;--background-secondary:#f4f6f7;--background-modifier-border:#dfe4e7;
+      --background-modifier-hover:#e9eef0;--text-normal:#222a31;--text-muted:#52616c;--text-faint:#81909a;
+      --text-accent:#246a73;--text-on-accent:#fff;--interactive-accent:#2a7782;--interactive-accent-hover:#226570;
+      --color-yellow:#c98b20;--text-error:#c94a4a;--font-ui-medium:14px;--font-text:ui-serif,Georgia,serif;
+    }
+    html,body{height:100%;margin:0;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    button,input{font:inherit}.paperlib-root{height:100vh}.paperlib-icon-button{font-size:18px}.paperlib-icon-button.small{font-size:14px}
+    .paperlib-detail-scroll{padding-bottom:30px}.paperlib-paper-row{font-family:inherit}.paperlib-sidebar-title button{font-size:13px}
+  </style>
+</head>
+<body>
+  <main class="paperlib-root">
+    <aside class="paperlib-sidebar">
+      <div class="paperlib-sidebar-title"><h2>Library</h2><button class="paperlib-icon-button" title="收起">‹</button></div>
+      <nav class="paperlib-nav">
+        <button class="paperlib-nav-item"><span class="paperlib-nav-icon">☆</span><span class="paperlib-nav-label">Starred</span><span class="paperlib-count">4</span></button>
+        <button class="paperlib-nav-item is-active is-strong"><span class="paperlib-nav-icon">▣</span><span class="paperlib-nav-label">My Papers</span><span class="paperlib-count">8</span></button>
+        <button class="paperlib-nav-item"><span class="paperlib-nav-icon">◴</span><span class="paperlib-nav-label">Recently Read</span></button>
+        <button class="paperlib-nav-item"><span class="paperlib-nav-icon">⚑</span><span class="paperlib-nav-label">Flagged</span><span class="paperlib-count">1</span></button>
+        <div class="paperlib-section-header"><div class="paperlib-section-label"><span>◇</span><span>Collections</span></div><button class="paperlib-icon-button small">＋</button></div>
+        <div class="paperlib-collections">
+          <button class="paperlib-nav-item"><span class="paperlib-nav-icon">□</span><span class="paperlib-nav-label">毕业论文</span></button>
+          <button class="paperlib-nav-item"><span class="paperlib-nav-icon">□</span><span class="paperlib-nav-label">Diffusion</span><span class="paperlib-count">1</span></button>
+          <button class="paperlib-nav-item"><span class="paperlib-nav-icon">□</span><span class="paperlib-nav-label">DONN</span><span class="paperlib-count">3</span></button>
+          <button class="paperlib-nav-item"><span class="paperlib-nav-icon">□</span><span class="paperlib-nav-label">Ga2O3</span></button>
+          <button class="paperlib-nav-item"><span class="paperlib-nav-icon">□</span><span class="paperlib-nav-label">ICCAD</span></button>
+          <button class="paperlib-nav-item"><span class="paperlib-nav-icon">□</span><span class="paperlib-nav-label">Nerf</span><span class="paperlib-count">1</span></button>
+          <button class="paperlib-nav-item"><span class="paperlib-nav-icon">□</span><span class="paperlib-nav-label">Optics</span><span class="paperlib-count">4</span></button>
+          <button class="paperlib-nav-item"><span class="paperlib-nav-icon">□</span><span class="paperlib-nav-label">PIC</span><span class="paperlib-count">2</span></button>
+        </div>
+      </nav>
+      <div class="paperlib-sidebar-spacer"></div><div class="paperlib-sidebar-bottom"><span>8 篇论文</span><button class="paperlib-icon-button">＋</button></div>
+    </aside>
+    <section class="paperlib-content">
+      <section class="paperlib-main">
+        <div class="paperlib-toolbar"><label class="paperlib-search"><span>⌕</span><input id="search" type="search" placeholder="Search my papers…"></label></div>
+        <div class="paperlib-list-head"><div><h3>My Papers</h3><span class="paperlib-subtitle">Your research, organized and close at hand</span></div><div class="paperlib-list-actions"><button class="paperlib-icon-button">⇥</button><button class="paperlib-icon-button">⚙</button></div></div>
+        <div class="paperlib-table-host"><div class="paperlib-table" id="table">
+          <div class="paperlib-row paperlib-table-header"><span class="paperlib-cell paperlib-attachment"></span><button class="paperlib-cell paperlib-sort paperlib-authors"><span>Authors</span></button><button class="paperlib-cell paperlib-sort paperlib-year"><span>Year</span></button><button class="paperlib-cell paperlib-sort paperlib-title"><span>Title</span></button><button class="paperlib-cell paperlib-sort paperlib-venue"><span>Venue</span></button></div>
+        </div><div class="paperlib-table-status"><span id="count">8 篇</span><span>1 selected</span></div></div>
+      </section>
+      <aside class="paperlib-detail">
+        <div class="paperlib-detail-bar"><div class="paperlib-detail-tabs"><button class="paperlib-icon-button is-active">ⓘ</button><button class="paperlib-icon-button">✎</button><button class="paperlib-icon-button">▥</button></div><div class="paperlib-detail-actions"><button class="paperlib-icon-button">×</button></div></div>
+        <div class="paperlib-detail-scroll">
+          <div class="paperlib-kicker"><span>Light: Science & Applications</span><span>2024</span></div>
+          <h1 class="paperlib-detail-title">All-optical image denoising using a diffractive visual processor</h1>
+          <div class="paperlib-detail-authors">Işıl, Çağatay · Gan, Tianyi · Ardic, Fazil Onuralp · Mentesoglu, Koray · Ozcan, Aydogan</div>
+          <div class="paperlib-abstract"><h4>Abstract</h4><p>Image denoising is one of the essential inverse problems. This work presents an all-optical visual processor that removes noise and artifacts from input images with a diffractive optical network.</p></div>
+          <div class="paperlib-quick-actions"><button class="paperlib-icon-button is-active is-filled">★</button><button class="paperlib-icon-button">⚑</button><div class="paperlib-rating"><button class="paperlib-icon-button is-active">★</button><button class="paperlib-icon-button is-active">★</button><button class="paperlib-icon-button is-active">★</button><button class="paperlib-icon-button is-active">★</button><button class="paperlib-icon-button is-active">★</button></div></div>
+          <div class="paperlib-meta-section"><div class="paperlib-meta-title"><h4>Tags</h4><button class="paperlib-icon-button">✎</button></div><div class="paperlib-chips"><button class="paperlib-chip">image-denoising</button><button class="paperlib-chip">DONN</button></div></div>
+          <div class="paperlib-meta-section"><div class="paperlib-meta-title"><h4>Collections</h4><button class="paperlib-icon-button">✎</button></div><div class="paperlib-chips"><button class="paperlib-chip">DONN</button><button class="paperlib-chip">Optics</button></div></div>
+          <div class="paperlib-meta-section"><h4>Identifiers</h4><div class="paperlib-identifier"><span class="paperlib-identifier-type">arXiv</span><a>2309.09215</a><button class="paperlib-icon-button">▣</button></div><div class="paperlib-identifier"><span class="paperlib-identifier-type">DOI</span><a>10.1038/s41377-024-01490-8</a><button class="paperlib-icon-button">▣</button></div></div>
+        </div>
+        <div class="paperlib-detail-footer"><button class="paperlib-primary-button"><span>▤</span><span>View PDF</span></button><button class="paperlib-icon-button">▧</button><button class="paperlib-icon-button paperlib-danger-button">⌫</button></div>
+      </aside>
+    </section>
+  </main>
+  <script>
+    const papers = [];
+    const table = document.querySelector('#table');
+    const draw = q => {
+      table.querySelectorAll('.paperlib-paper-row').forEach(el=>el.remove());
+      const filtered = papers.filter(p=>p.join(' ').toLowerCase().includes(q.toLowerCase()));
+      filtered.forEach((p,i)=>{
+        const row=document.createElement('button');row.className=`paperlib-row paperlib-paper-row ${i===0?'is-selected':''}`;
+        row.innerHTML=`<span class="paperlib-cell paperlib-attachment">${p[4]?'⌕':'▧'}</span><span class="paperlib-cell paperlib-authors">${p[0]}</span><span class="paperlib-cell paperlib-year">${p[1]}</span><span class="paperlib-cell paperlib-title">${p[2]}${p[4]?'<span class="paperlib-inline-star">★</span>':''}</span><span class="paperlib-cell paperlib-venue">${p[3]}</span>`;
+        row.onclick=()=>{document.querySelectorAll('.paperlib-paper-row').forEach(r=>r.classList.remove('is-selected'));row.classList.add('is-selected')};table.appendChild(row)
+      });
+      document.querySelector('#count').textContent=`${filtered.length} 篇`;
+    };
+    draw('');document.querySelector('#search').addEventListener('input',e=>draw(e.target.value));
+  </script>
+</body>
+</html>
