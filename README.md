@@ -133,32 +133,15 @@ Paper Composer 是 Paper Library 内置的智能写作与研究侧栏。它与�
 
 ## 安装
 
-### 从 GitHub Release 安装
+### 通过 BRAT 安装
 
-1. 前往 [Releases](https://github.com/Lyle-xub/obsidian-paper-library/releases) 下载最新的 `paper-library-*.zip`。
-2. 解压到 Vault 的 `.obsidian/plugins/paper-library/`。
-3. 重启 Obsidian，在「设置 → 第三方插件」中启用 **Paper Library**。
-4. 点击左侧 ribbon 的 Library 图标，或运行命令 `Open paper library`。
+1. 在 Obsidian 的「设置 → 第三方插件 → 浏览」中安装并启用 [BRAT](https://github.com/TfTHacker/obsidian42-brat)。
+2. 打开命令面板，运行 `BRAT: Add a beta plugin for testing`。
+3. 粘贴仓库地址：`https://github.com/Lyle-xub/obsidian-paper-library`。
+4. BRAT 安装完成后，在「设置 → 第三方插件」中启用 **Paper Library**。
+5. 点击左侧 ribbon 的 Library 图标，或运行命令 `Open paper library`。
 
-目录中至少应包含：
-
-```text
-paper-library/
-├── manifest.json
-├── main.js
-├── styles.css
-├── pipeline/
-└── vendor/
-```
-
-### 开发版安装
-
-```bash
-git clone https://github.com/Lyle-xub/obsidian-paper-library.git
-ln -s "/absolute/path/obsidian-paper-library" "/absolute/path/your-vault/.obsidian/plugins/paper-library"
-```
-
-然后在 Obsidian 中重新加载插件。仓库已包含可直接运行的 `main.js`，无需在 Vault 中安装 npm 依赖。
+后续版本可直接通过 BRAT 检查并安装更新。
 
 ## 浏览器一键导入
 
@@ -171,14 +154,6 @@ ln -s "/absolute/path/obsidian-paper-library" "/absolute/path/your-vault/.obsidi
 
 在扩展管理页面开启开发者模式，加载 `browser-extension/`，随后在 Paper Library 设置中启用浏览器扩展服务并复制配对 Token。详细说明见 [browser-extension/README.md](browser-extension/README.md)。
 
-## 数据与隐私
-
-- 论文库状态、标注、笔迹、解析缓存和阅读笔记默认保留在本地。
-- `data.json`、模型、运行时、识别缓存与下载文件均被排除在 Git 仓库之外。
-- 在线元数据查询可以关闭；关闭后不会把识别出的标题、DOI 或 arXiv ID 发往在线数据源。
-- 使用 AI 时，仅按当前会话中选择的上下文模式发送内容。
-- 含数字签名的文件不会被直接改写，避免破坏签名有效性。
-
 ## 平台支持
 
 | 能力 | 桌面端 | iOS / Android |
@@ -190,27 +165,6 @@ ln -s "/absolute/path/obsidian-paper-library" "/absolute/path/your-vault/.obsidi
 | 本地版面与图片识别 | ✓ | — |
 
 移动端采用更低的页面渲染倍率和紧凑工具栏，以降低 WebView 内存压力。桌面与移动端外观设置互不覆盖。
-
-## Markdown 导入
-
-在笔记 frontmatter 中添加以下字段，再运行 `Import current note as paper`：
-
-```yaml
----
-title: "Paper title"
-authors: ["Ada Lovelace", "Alan Turing"]
-year: 2026
-venue: "Journal or conference"
-venue_rankings: ["CCF:A", "JCR:Q1"]
-tags: [optics, imaging]
-collections: [Reading]
-doi: "10.xxxx/xxxxx"
-arxiv: "2601.01234"
-pdf: "Papers/paper.pdf"
-rating: 4
-starred: true
----
-```
 
 ## 开发
 
