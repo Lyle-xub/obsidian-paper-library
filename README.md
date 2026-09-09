@@ -8,7 +8,7 @@
 
 从收藏论文到勾画原文，从连接想法到追问整篇文档。一个插件，一条完整的研究工作流。
 
-[![Version](https://img.shields.io/badge/version-0.41.0-2563d8?style=flat-square)](https://github.com/Lyle-xub/obsidian-paper-library/releases)
+[![Version](https://img.shields.io/badge/version-0.42.3-2563d8?style=flat-square)](https://github.com/Lyle-xub/obsidian-paper-library/releases)
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.5%2B-7c3aed?style=flat-square&logo=obsidian&logoColor=white)](https://obsidian.md)
 [![Platforms](https://img.shields.io/badge/platforms-desktop%20%7C%20mobile-24415e?style=flat-square)](#平台支持)
 [![License](https://img.shields.io/badge/license-MIT-2f7a61?style=flat-square)](LICENSE)

@@ -35,6 +35,25 @@ assert.ok(!plugin.extractAbstractFromPdfText(sample).includes("Introduction"));
 assert.equal(plugin.guessVenueFromPdfText("Proceedings of the 20th USENIX Symposium on Operating Systems Design and Implementation, 2026"), "OSDI");
 assert.equal(plugin.guessVenueFromPdfText("Proceedings of the 42nd International Conference on Machine Learning"), "ICML");
 assert.equal(plugin.guessVenueFromPdfText("IEEE/CVF Conference on Computer Vision and Pattern Recognition 2026"), "CVPR");
+plugin.settings.conferenceRankingDatabase.conferences.push({
+  kind: "conference",
+  shortName: "Performance",
+  fullName: "International Symposium on Computer Performance, Modeling, Measurements",
+  dblp: "performance",
+  aliases: ["Performance"]
+});
+plugin.conferenceRankingLookup = null;
+assert.equal(plugin.guessVenueFromPdfText("Abstract\nOur method improves GUI agent performance by reducing visual tokens."), "");
+assert.equal(plugin.guessVenueFromPdfText("International Symposium on Computer Performance, Modeling, Measurements"), "Performance");
+assert.equal(plugin.isAmbiguousConferenceVenue("Performance"), true);
+assert.equal(plugin.isAmbiguousConferenceVenue("OSDI"), false);
+assert.equal(plugin.guessYearFromPdfMetadata("", "arXiv: 2605.19260", "2605.19260"), 2026);
+assert.equal(plugin.guessYearFromPdfMetadata("", "Reference identifier 2605.19260", ""), 0);
+assert.equal(plugin.guessYearFromPdfMetadata("", "Published in 2026", ""), 2026);
+assert.equal(plugin.mergePaperMetadata(
+  { title: "AQuaUI", authors: [], year: 1926, venue: "", abstract: "", tags: [], doi: "", arxiv: "2605.19260" },
+  { title: "AQuaUI", authors: [], year: 2026, venue: "arXiv", abstract: "", tags: [], doi: "", arxiv: "2605.19260", publicationType: "preprint" }
+).year, 2026);
 assert.equal(plugin.mergePaperMetadata(
   { title, authors: [], year: 2026, venue: "", abstract: "Local abstract", tags: [], doi: "", arxiv: "" },
   { title, authors: [], year: 2026, venue: "OSDI", abstract: "", tags: [], doi: "", arxiv: "" }

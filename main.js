@@ -905,8 +905,9 @@ function appearanceContrastColor(value) {
   return luminance > 0.43 ? "#172435" : "#ffffff";
 }
 
-const PAPER_COMPOSER_MODEL_OPTIONS_VERSION = 6;
+const PAPER_COMPOSER_MODEL_OPTIONS_VERSION = 7;
 const PAPER_COMPOSER_CHATGPT_FALLBACK_MODEL = "gpt-5.4";
+const PAPER_COMPOSER_CHATGPT_BUNDLED_CODEX_PATH = "/Applications/ChatGPT.app/Contents/Resources/codex";
 const PAPER_COMPOSER_CLI_PROVIDERS = new Set(["kimi"]);
 
 const DEFAULT_SETTINGS = {
@@ -1142,6 +1143,22 @@ function normalizeArxivId(value) {
     return year >= 7 && year <= currentYear + 1 && month >= 1 && month <= 12 ? raw : "";
   }
   return /^[a-z][a-z0-9.-]*\/\d{7}$/i.test(raw) ? raw : "";
+}
+
+function yearFromArxivId(value) {
+  const id = normalizeArxivId(value);
+  const match = id.match(/^(\d{2})(\d{2})\./);
+  if (!match) return 0;
+  const year = 2000 + Number(match[1]);
+  const month = Number(match[2]);
+  return month >= 1 && month <= 12 ? year : 0;
+}
+
+function isPlausiblePaperYear(value, arxiv = "") {
+  const year = Number(value) || 0;
+  if (year < 1800 || year > new Date().getFullYear() + 2) return false;
+  const arxivYear = yearFromArxivId(arxiv);
+  return !arxivYear || Math.abs(year - arxivYear) <= 10;
 }
 
 function isArxivDoi(value) {
@@ -8457,6 +8474,39 @@ class PaperLibrarySettingTab extends PluginSettingTab {
     root.querySelectorAll?.(".paper-composer-settings-tab, button[role='tab']").forEach((element) => {
       if (/^(collab|collaboration|协作)$/i.test(String(element.textContent || "").trim())) element.remove();
     });
+    const refresh = root.querySelector?.(
+      ".paper-composer-provider-model-picker--codex .paper-composer-provider-model-picker-action"
+    );
+    if (refresh && !refresh.paperLibraryModelRefreshBound) {
+      refresh.paperLibraryModelRefreshBound = true;
+      refresh.addEventListener("click", () => this.syncRefreshedComposerModels(refresh));
+    }
+  }
+
+  async syncRefreshedComposerModels(button) {
+    const runtime = this.plugin.claudianRuntime;
+    if (!runtime?.settings || !button) return;
+    const before = Number(runtime.settings.providerConfigs?.codex?.catalogTimestamp) || 0;
+    const deadline = Date.now() + 30000;
+    while (button.isConnected && Date.now() < deadline) {
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+      const codex = runtime.settings.providerConfigs?.codex;
+      const finished = (Number(codex?.catalogTimestamp) || 0) !== before
+        || (!button.disabled && !/loading/i.test(String(button.textContent || "")));
+      if (!finished) continue;
+      const models = [...new Set((codex?.discoveredModels || [])
+        .map((entry) => String(entry?.model || "").trim()).filter(Boolean))];
+      if (!models.length || (Array.isArray(codex.visibleModels)
+        && models.length === codex.visibleModels.length
+        && models.every((model, index) => model === codex.visibleModels[index]))) return;
+      await runtime.mutateSettings((settings) => {
+        const config = settings.providerConfigs?.codex;
+        if (config) config.visibleModels = models;
+      });
+      await runtime.notifyProviderChatOptionsChanged?.("codex");
+      if (this.composerSettingsHost?.isConnected) await this.renderEmbeddedComposerSettings();
+      return;
+    }
   }
 
   async renderEmbeddedComposerSettings() {
@@ -8530,85 +8580,6 @@ class PaperLibrarySettingTab extends PluginSettingTab {
           await this.plugin.selectPaperComposerSettingsProvider(value);
           this.display();
         }));
-
-    const providerDefinitions = [{
-      id: "kimi",
-      name: "Kimi Code CLI",
-      binary: "kimi",
-      placeholder: "/Users/you/.kimi-code/bin/kimi",
-      args: "-p {prompt} --output-format text",
-      description: "使用 Kimi 自己的登录状态与配置；插件不会保存 Kimi 密钥。"
-    }];
-    providerDefinitions.forEach((definition) => {
-      const config = this.plugin.getPaperComposerCliProviderConfig(definition.id);
-      const resolvedPath = this.plugin.resolvePaperComposerCliPath(definition.id);
-      const modelCatalog = this.plugin.getPaperComposerCliModels(definition.id);
-      const visibleModels = this.plugin.getPaperComposerCliVisibleModels(definition.id);
-      const section = container.createDiv({ cls: "paperlib-composer-cli-provider" });
-      new Setting(section)
-        .setName(`启用 ${definition.name}`)
-        .setDesc(`${definition.description} ${resolvedPath ? `已自动检测：${resolvedPath}` : `尚未检测到 ${definition.binary} 命令。`}`)
-        .addToggle((toggle) => toggle
-          .setValue(config.enabled === true)
-          .onChange(async (enabled) => {
-            await this.plugin.updatePaperComposerCliProvider(definition.id, { enabled });
-            if (!enabled && this.plugin.getPaperComposerSettingsProvider() === definition.id) {
-              await this.plugin.selectPaperComposerSettingsProvider("codex");
-            }
-            this.display();
-          }))
-        .addButton((button) => button
-          .setButtonText("重新检测")
-          .onClick(async () => {
-            button.setDisabled(true).setButtonText("检测中…");
-            try {
-              const version = await this.plugin.testPaperComposerCli(definition.id);
-              new Notice(`${definition.name} 可用${version ? ` · ${version}` : ""}`);
-            } catch (error) {
-              new Notice(`${definition.name} 不可用：${error?.message || error}`);
-            } finally {
-              button.setDisabled(false).setButtonText("重新检测");
-            }
-          }));
-      new Setting(section)
-        .setName("可见模型")
-        .setDesc(modelCatalog.configPath
-          ? `已选择 ${visibleModels.length}/${modelCatalog.models.length} 个；顺序第一的模型作为默认值。模型与别名来自 ${modelCatalog.configPath}。`
-          : "在完整 Provider 设置中发现并多选 Kimi 模型。")
-        .addButton((button) => button
-          .setButtonText("配置模型")
-          .onClick(() => this.openEmbeddedComposerSettings()));
-      new Setting(section)
-        .setName("CLI 路径")
-        .setDesc("留空时自动从 PATH 和常见安装目录查找。")
-        .addText((text) => text
-          .setPlaceholder(definition.placeholder)
-          .setValue(String(config.cliPath || ""))
-          .onChange(async (value) => {
-            await this.plugin.updatePaperComposerCliProvider(definition.id, { cliPath: value.trim() });
-          }));
-      new Setting(section)
-        .setName("启动参数")
-        .setDesc("{prompt} 会替换为当前对话内容；所选模型会自动通过 --model 传入。")
-        .addText((text) => text
-          .setPlaceholder(definition.args)
-          .setValue(String(config.argsTemplate || ""))
-          .onChange(async (value) => {
-            await this.plugin.updatePaperComposerCliProvider(definition.id, { argsTemplate: value.trim() });
-          }));
-      new Setting(section)
-        .setName("环境变量")
-        .setDesc("可选，每行填写一个 KEY=VALUE。登录凭据仍由 Kimi CLI 自己管理。")
-        .addTextArea((area) => {
-          area.inputEl.rows = 4;
-          return area
-            .setPlaceholder("KIMI_SETTING=value")
-            .setValue(String(config.environmentVariables || ""))
-            .onChange(async (value) => {
-              await this.plugin.updatePaperComposerCliProvider(definition.id, { environmentVariables: value });
-            });
-        });
-    });
   }
 
   renderPluginUpdateSettings(containerEl) {
@@ -8913,7 +8884,7 @@ class PaperLibrarySettingTab extends PluginSettingTab {
     composerSettingsButton.addEventListener("click", () => this.openEmbeddedComposerSettings());
     composerCard.createEl("p", {
       cls: "paperlib-composer-oauth-warning",
-      text: "账号连接由本机 Claude Code、Codex 或 Kimi CLI 管理，Paper Library 不保存第三方 OAuth 令牌。Kimi CLI 会自动检测；首次使用前请先完成登录。完整代理仅支持桌面端与 Obsidian 1.13+。"
+      text: "账号连接由各 Provider 的本机 CLI 管理，Paper Library 不保存第三方 OAuth 令牌。启用状态、模型、路径与环境变量统一在下方 Provider 设置中管理。完整代理仅支持桌面端与 Obsidian 1.13+。"
     });
     const composerCliSettings = composerCard.createDiv({ cls: "paperlib-composer-cli-settings" });
     this.renderPaperComposerCliSettings(composerCliSettings);
@@ -9615,6 +9586,8 @@ module.exports = class PaperLibraryPlugin extends Plugin {
         }
         try { await this.syncConferenceRankingDatabase(); }
         catch (error) { console.warn("Paper Library: conference ranking database update unavailable", error); }
+        try { await this.repairMisreadPdfPublicationMetadata(); }
+        catch (error) { console.warn("Paper Library: imported publication metadata repair unavailable", error); }
         try { await this.syncConferenceRateDatabase(); }
         catch (error) { console.warn("Paper Library: conference rate database update unavailable", error); }
         try { await this.upgradeRepositoryVenueMetadata(); }
@@ -9787,6 +9760,7 @@ module.exports = class PaperLibraryPlugin extends Plugin {
       return false;
     }
 
+    const fs = require("fs");
     const previousOptionsVersion = Number(this.settings?.paperComposerModelOptionsVersion) || 0;
     const settings = runtime.settings;
     const providerConfigs = settings.providerConfigs && typeof settings.providerConfigs === "object"
@@ -9795,6 +9769,14 @@ module.exports = class PaperLibraryPlugin extends Plugin {
       && !Array.isArray(providerConfigs.codex) ? { ...providerConfigs.codex } : {};
     const opencode = providerConfigs.opencode && typeof providerConfigs.opencode === "object"
       && !Array.isArray(providerConfigs.opencode) ? { ...providerConfigs.opencode } : {};
+
+    const hasExplicitCodexPath = Boolean(String(codex.cliPath || "").trim()
+      || Object.values(codex.cliPathsByHost || {}).some((value) => String(value || "").trim()));
+    if (!hasExplicitCodexPath && process.platform === "darwin" && fs.existsSync(PAPER_COMPOSER_CHATGPT_BUNDLED_CODEX_PATH)) {
+      codex.cliPath = PAPER_COMPOSER_CHATGPT_BUNDLED_CODEX_PATH;
+      codex.catalogFingerprint = "";
+      codex.catalogTimestamp = 0;
+    }
 
     codex.enabled = true;
     const discoveredChatGptModels = (Array.isArray(codex.discoveredModels) ? codex.discoveredModels : [])
@@ -17986,9 +17968,7 @@ module.exports = class PaperLibraryPlugin extends Plugin {
       .filter((value) => value.length > 1)
       .slice(0, 10);
     const dateText = String(info.CreationDate || info.ModDate || "");
-    const year = Number.parseInt(dateText.match(/(?:D:)?((?:19|20)\d{2})/)?.[1] || "", 10)
-      || Number.parseInt(text.match(/(?:©|copyright)?\s*((?:19|20)\d{2})/i)?.[1] || "", 10)
-      || 0;
+    const year = this.guessYearFromPdfMetadata(dateText, text, arxiv);
     return {
       title,
       authors,
@@ -18246,9 +18226,42 @@ module.exports = class PaperLibraryPlugin extends Plugin {
   }
 
   guessVenueFromPdfText(text) {
-    const value = String(text || "").replace(/\s+/g, " ").trim();
-    const rule = this.findConferenceRankingRule(value) || findVenueRankingRule(value);
-    return rule?.kind === "conference" ? rule.shortName : "";
+    const source = String(text || "").replace(/\u0000/g, " ");
+    const staticRule = findVenueRankingRule(source);
+    if (staticRule?.kind === "conference") return staticRule.shortName;
+
+    // Some conference aliases are also ordinary prose words (for example
+    // "Performance"). Dynamic matches must be exact lines or lines that
+    // explicitly look like publication information, never arbitrary abstracts.
+    const venueSignal = /\b(?:conference|symposium|proceedings|workshop|annual meeting)\b/i;
+    const lines = source.split(/\r?\n+/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
+    for (const line of lines.slice(0, 100)) {
+      const key = normalizeVenueLookup(line);
+      const lookup = this.conferenceRankingLookup || this.buildConferenceRankingLookup();
+      const exact = lookup.exact.get(key);
+      if (exact?.kind === "conference") return exact.shortName;
+      if (!venueSignal.test(line)) continue;
+      const rule = this.findConferenceRankingRule(line);
+      if (rule?.kind === "conference") return rule.shortName;
+    }
+    return "";
+  }
+
+  guessYearFromPdfMetadata(dateText, text, arxiv = "") {
+    const embedded = Number.parseInt(String(dateText || "").match(/(?:D:)?((?:19|20)\d{2})/)?.[1] || "", 10);
+    if (embedded) return embedded;
+    const arxivYear = yearFromArxivId(arxiv);
+    if (arxivYear) return arxivYear;
+    // Do not accept digits embedded in identifiers such as 2605.19260.
+    return Number.parseInt(String(text || "").match(/(?:^|[^\d.])(?:©|copyright)?\s*((?:19|20)\d{2})(?![\d.])/im)?.[1] || "", 10) || 0;
+  }
+
+  isAmbiguousConferenceVenue(value) {
+    const rule = this.findConferenceRankingRule(value);
+    const shortName = String(rule?.shortName || "").trim();
+    return Boolean(shortName
+      && normalizeVenueLookup(value) === normalizeVenueLookup(shortName)
+      && /^[A-Z][a-z]{5,}$/.test(shortName));
   }
 
   paperMetadataMissingFields(metadata) {
@@ -18257,7 +18270,7 @@ module.exports = class PaperLibraryPlugin extends Plugin {
     const missing = [];
     if (!isTitleSufficientForLookup(metadata?.title || "")) missing.push("title");
     if (!authors.length || authors.some((author) => /…|\.\.\.$/.test(String(author).trim()))) missing.push("authors");
-    if (year < 1800 || year > new Date().getFullYear() + 2) missing.push("year");
+    if (!isPlausiblePaperYear(year, metadata?.arxiv || arxivIdFromDoi(metadata?.doi))) missing.push("year");
     if (!hasFormalPublicationVenue(metadata || {})) missing.push("venue");
     return missing;
   }
@@ -18276,7 +18289,9 @@ module.exports = class PaperLibraryPlugin extends Plugin {
       source: primary?.source ? `${primary.source} + Semantic Scholar` : "Semantic Scholar",
       title: isTitleSufficientForLookup(base.title || "") ? base.title : (semantic.title || base.title),
       authors: authorsIncomplete && (semantic.authors || []).length ? semantic.authors : baseAuthors,
-      year: baseYear >= 1800 ? baseYear : (Number(semantic.year) || baseYear),
+      year: isPlausiblePaperYear(baseYear, base.arxiv || semantic.arxiv)
+        ? baseYear
+        : (Number(semantic.year) || yearFromArxivId(base.arxiv || semantic.arxiv) || baseYear),
       venue: baseVenueIsFormal
         ? base.venue
         : (semanticVenueIsFormal ? semantic.venue : (base.venue || semantic.venue || "")),
@@ -20557,11 +20572,14 @@ module.exports = class PaperLibraryPlugin extends Plugin {
           ? local.title
           : (paper.title || local?.title || "");
         const lookupAuthors = (paper.authors || []).length ? paper.authors : (local?.authors || []);
+        const lookupArxiv = paper.arxiv || local?.arxiv || "";
         remote = await this.lookupPaperMetadata({
           title: lookupTitle,
           doi: paper.doi || local?.doi || "",
-          arxiv: paper.arxiv || local?.arxiv || "",
-          year: paper.year || local?.year || 0,
+          arxiv: lookupArxiv,
+          year: isPlausiblePaperYear(paper.year, lookupArxiv)
+            ? paper.year
+            : (local?.year || yearFromArxivId(lookupArxiv)),
           authors: lookupAuthors,
           semanticScholarPaperId: paper.semanticScholarPaperId || "",
           forceSemanticScholar: true
@@ -20589,8 +20607,12 @@ module.exports = class PaperLibraryPlugin extends Plugin {
         filled.push("title");
       } else fillField("title", merged.title);
       const shouldUpgradeVenue = !isRepositoryVenue(merged.venue) && isRepositoryVenue(paper.venue);
-      if (shouldUpgradeVenue) {
+      const shouldReplaceAmbiguousVenue = Boolean(local)
+        && this.isAmbiguousConferenceVenue(paper.venue)
+        && normalizeVenueLookup(local.venue) !== normalizeVenueLookup(paper.venue);
+      if (shouldUpgradeVenue || shouldReplaceAmbiguousVenue) {
         paper.venue = merged.venue;
+        if (shouldReplaceAmbiguousVenue) paper.venueRanks = [];
         filled.push("venue");
       } else fillField("venue", merged.venue);
       const existingArxivDoi = arxivIdFromDoi(paper.doi);
@@ -20609,7 +20631,9 @@ module.exports = class PaperLibraryPlugin extends Plugin {
         paper.serpApiCitationCount = merged.serpApiCitationCount;
       }
       if (merged.serpApiSourceUrl) paper.serpApiSourceUrl = merged.serpApiSourceUrl;
-      if (shouldUpgradeVenue && merged.year && paper.year !== merged.year) {
+      const shouldCorrectInvalidYear = merged.year && paper.year !== merged.year
+        && !isPlausiblePaperYear(paper.year, paper.arxiv || merged.arxiv);
+      if ((shouldUpgradeVenue || shouldCorrectInvalidYear) && merged.year && paper.year !== merged.year) {
         paper.year = merged.year;
         filled.push("year");
       } else if (!paper.year && merged.year) {
@@ -20660,6 +20684,39 @@ module.exports = class PaperLibraryPlugin extends Plugin {
     }
   }
 
+  async repairMisreadPdfPublicationMetadata() {
+    let changed = false;
+    for (const paper of this.settings.papers) {
+      const arxiv = paper.arxiv || arxivIdFromDoi(paper.doi);
+      const badYear = !isPlausiblePaperYear(paper.year, arxiv);
+      const ambiguousVenue = this.isAmbiguousConferenceVenue(paper.venue);
+      if (!badYear && !ambiguousVenue) continue;
+      const file = paper.pdfPath && !/^https?:\/\//i.test(paper.pdfPath)
+        ? this.app.vault.getAbstractFileByPath(normalizePath(paper.pdfPath))
+        : null;
+      let local = null;
+      if (file?.extension === "pdf") {
+        try {
+          local = await this.extractLocalPdfMetadata(await this.app.vault.readBinary(file), paper.originalPdfName || file.name);
+        } catch (error) {
+          console.warn(`Paper Library: metadata repair skipped for ${paper.title}`, error);
+        }
+      }
+      const correctedYear = local?.year || yearFromArxivId(arxiv);
+      if (badYear && correctedYear && paper.year !== correctedYear) {
+        paper.year = correctedYear;
+        changed = true;
+      }
+      if (ambiguousVenue && local && normalizeVenueLookup(local.venue) !== normalizeVenueLookup(paper.venue)) {
+        paper.venue = local.venue || "";
+        paper.venueRanks = [];
+        changed = true;
+      }
+    }
+    if (changed) await this.saveSettings();
+    return changed;
+  }
+
   mergePaperMetadata(local, remote) {
     const localArxiv = local.arxiv || arxivIdFromDoi(local.doi);
     if (!remote) return {
@@ -20678,7 +20735,9 @@ module.exports = class PaperLibraryPlugin extends Plugin {
     return {
       title: choose("title"),
       authors: chooseMetadataAuthors(local.authors, remote.authors, choose("title")),
-      year: remoteIsPreprint && local.year ? local.year : (remote.year || local.year),
+      year: remoteIsPreprint && isPlausiblePaperYear(local.year, localArxiv)
+        ? local.year
+        : (remote.year || (isPlausiblePaperYear(local.year, localArxiv) ? local.year : yearFromArxivId(localArxiv))),
       venue: localVenueIsMoreSpecific ? local.venue : choose("venue"),
       journalAbbreviation: choose("journalAbbreviation"),
       volume: choose("volume"),

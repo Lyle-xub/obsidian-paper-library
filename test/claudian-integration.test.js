@@ -86,6 +86,8 @@ assert.ok(main.includes('name: "Paper Composer"'), "embedded runtime must use th
 assert.ok(main.includes('.replace(/\\bClaudian\\b/g, "Paper Composer")'), "all remaining visible upstream labels must be normalized at load time");
 assert.ok(main.includes('displayName:"ChatGPT"'), "the direct OpenAI-account provider must be presented as ChatGPT");
 assert.ok(main.includes('PAPER_COMPOSER_CHATGPT_FALLBACK_MODEL = "gpt-5.4"'), "ChatGPT must have a durable catalog fallback");
+assert.ok(main.includes('PAPER_COMPOSER_CHATGPT_BUNDLED_CODEX_PATH = "/Applications/ChatGPT.app/Contents/Resources/codex"'), "ChatGPT must prefer its current bundled Codex CLI when no path was configured");
+assert.ok(main.includes('codex.catalogFingerprint = ""'), "switching to the bundled Codex CLI must invalidate the stale five-model catalog");
 assert.ok(main.includes('String(alias || "").trim() === "ChatGPT"'), "the generated ChatGPT model alias must be migrated away");
 assert.ok(!main.includes('[chatGptRuntimeModel]: codex.modelAliases?.[chatGptRuntimeModel] || "ChatGPT"'), "GPT-5.6 must keep its catalog model name by default");
 assert.ok(main.includes('PAPER_COMPOSER_CLI_PROVIDERS = new Set(["kimi"])'), "Kimi must be an independent CLI provider");
@@ -134,13 +136,18 @@ assert.ok(main.includes("removeLegacyComposerSettingTabs"), "upgrades must remov
 assert.ok(main.includes("this.claudianSettingTab = settingTab"), "parent plugin must capture the complete embedded settings renderer");
 assert.ok(main.includes("paperlib-composer-embedded-settings"), "complete Composer settings must live inside Paper Library settings");
 assert.ok(main.includes("normalizeEmbeddedComposerSurface"), "embedded settings must present Paper Composer as a Paper Library feature");
+assert.ok(main.includes("syncRefreshedComposerModels"), "a forced ChatGPT catalog refresh must update the visible chat models");
+assert.ok(main.includes("config.visibleModels = models"), "newly detected ChatGPT models must become selectable immediately after refresh");
 assert.ok(main.includes("this.app.setting?.openTabById?.(this.manifest.id)"), "Composer settings commands must open the Paper Library tab");
 assert.ok(!main.includes('openTabById?.("paper-library-claudian-runtime")'), "no standalone runtime settings tab may remain");
 assert.ok(main.includes('getDesktopPluginPath("vendor/claudian.bundle.js")'), "runtime must resolve from an absolute plugin path in Electron");
 assert.ok(main.includes('const compile = new Function(') && main.includes('"paperComposerObsidianComponents", source'), "runtime must inject Obsidian UI components into nested providers");
 assert.ok(main.includes("paperComposerCliProviders({taskResultInterpreter:Q6e,obsidianComponents:paperComposerObsidianComponents})"), "the isolated runtime must register the independent Kimi CLI provider");
 assert.ok(main.includes("delete require.cache[require.resolve(cliProviderPath)]"), "Kimi provider adapter must refresh when the plugin is toggled or updated");
-assert.ok(main.includes("renderPaperComposerCliSettings"), "Kimi configuration must live in Paper Library settings");
+assert.ok(main.includes("renderPaperComposerCliSettings"), "the default provider selector must live in Paper Library settings");
+const genericProviderSettings = main.slice(main.indexOf("renderPaperComposerCliSettings(container)"), main.indexOf("renderPluginUpdateSettings(containerEl)"));
+assert.ok(!genericProviderSettings.includes('id: "kimi"'), "the general provider selector must not duplicate Kimi settings");
+assert.ok(!genericProviderSettings.includes("重新检测"), "provider-specific CLI controls must stay on their Provider pages");
 assert.ok(main.includes("selectPaperComposerSettingsProvider"), "settings must select the default CLI provider");
 assert.ok(cliProviders.includes('binary: "kimi"'), "Kimi must invoke the Kimi Code CLI directly");
 assert.ok(cliProviders.includes('defaultArgs: ["-p", "{prompt}", "--output-format", "text"]'), "Kimi must use its supported non-interactive mode");
