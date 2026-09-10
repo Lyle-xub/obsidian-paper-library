@@ -50,6 +50,7 @@ Paper Library 将资料库、阅读器、可视化研究空间和智能对话整
 - Obsidian 原生三栏布局：左侧导航、中央论文库、右侧详情。
 - Starred、Daily Board、Recently Read、Flagged、Tags 与层级 Collections。
 - 拖入文档后提取本地元数据，并可通过 DOI、arXiv 或标题补全信息。
+- 独立记录出版载体与内容类型，支持自动识别、筛选、批量修改及 Markdown 属性同步。
 - 自动识别期刊与会议信息，支持 CCF、JCR、影响因子和会议录用率。
 - 管理论文主文件、补充材料、Markdown 阅读笔记及引用关系。
 - APA、IEEE、Chicago、MLA、Harvard、Vancouver 等引用预览与导出。

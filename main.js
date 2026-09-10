@@ -269,12 +269,13 @@ const PAPER_TABLE_COLUMNS = {
   authors: { width: 220, min: 140, max: 520 },
   year: { width: 86, min: 68, max: 180 },
   title: { width: 520, min: 240, max: 1100 },
+  type: { width: 180, min: 130, max: 320 },
   rating: { width: 104, min: 86, max: 150 },
   venue: { width: 240, min: 140, max: 600 },
   rankings: { width: 300, min: 180, max: 640 }
 };
 const DEFAULT_PAPER_TABLE_COLUMN_ORDER = [
-  "favorite", "attachment", "authors", "year", "title", "rating", "venue", "rankings"
+  "favorite", "attachment", "authors", "year", "title", "type", "rating", "venue", "rankings"
 ];
 const PAPER_TABLE_COLUMN_META = {
   favorite: { label: "收藏", icon: "circle" },
@@ -282,6 +283,7 @@ const PAPER_TABLE_COLUMN_META = {
   authors: { label: "Authors" },
   year: { label: "Year" },
   title: { label: "Title" },
+  type: { label: "Type" },
   rating: { label: "Rating" },
   venue: { label: "Venue" },
   rankings: { label: "Rank" }
@@ -296,6 +298,88 @@ const FAVORITE_COLORS = [
   { id: "orange", label: "橙色", value: "#eca35f" },
   { id: "gray", label: "灰色", value: "#aeb3ba" }
 ];
+
+const PUBLICATION_TYPES = [
+  { id: "journal-article", label: "期刊论文", aliases: ["article", "journalarticle", "article-journal", "journal article", "journal", "published-paper"] },
+  { id: "conference-paper", label: "会议论文", aliases: ["conferencepaper", "paper-conference", "proceedings-article", "conference paper", "conference", "proceedings"] },
+  { id: "thesis", label: "学位论文", aliases: ["dissertation", "phdthesis", "mastersthesis", "doctoral thesis", "master thesis"] },
+  { id: "patent", label: "专利", aliases: ["pat"] },
+  { id: "preprint", label: "预印本", aliases: ["posted-content", "posted content", "arxiv", "biorxiv", "medrxiv"] },
+  { id: "book", label: "图书", aliases: ["monograph"] },
+  { id: "book-chapter", label: "图书章节", aliases: ["booksection", "book-section", "chapter", "book chapter"] },
+  { id: "technical-report", label: "技术报告", aliases: ["report", "techreport", "technical report"] },
+  { id: "standard", label: "标准", aliases: ["standard document"] },
+  { id: "other", label: "其他", aliases: ["misc", "generic"] }
+];
+const CONTENT_TYPES = [
+  { id: "research-article", label: "研究论文", aliases: ["original article", "research article", "original research"] },
+  { id: "review", label: "综述", aliases: ["review article", "literature review", "survey"] },
+  { id: "systematic-review", label: "系统综述 / Meta 分析", aliases: ["systematic review", "meta-analysis", "meta analysis"] },
+  { id: "methods-protocol", label: "方法 / 实验方案", aliases: ["method", "methods", "protocol", "methodology"] },
+  { id: "perspective-commentary", label: "观点 / 评论", aliases: ["perspective", "commentary", "editorial", "opinion"] },
+  { id: "dataset-benchmark", label: "数据集 / Benchmark", aliases: ["dataset", "data paper", "benchmark"] },
+  { id: "other", label: "其他", aliases: ["misc", "generic"] }
+];
+
+function normalizePaperType(value, options) {
+  const normalized = String(value || "").normalize("NFKC").trim().toLocaleLowerCase()
+    .replace(/[_\s]+/g, "-");
+  if (!normalized) return "";
+  const compact = normalized.replace(/-/g, "");
+  return options.find((option) => option.id === normalized || option.aliases.some((alias) => {
+    const normalizedAlias = alias.toLocaleLowerCase().replace(/[_\s]+/g, "-");
+    return normalizedAlias === normalized || normalizedAlias.replace(/-/g, "") === compact;
+  }))?.id || "";
+}
+
+function normalizePublicationType(value) {
+  return normalizePaperType(value, PUBLICATION_TYPES);
+}
+
+function normalizeContentType(value) {
+  return normalizePaperType(value, CONTENT_TYPES);
+}
+
+function paperTypeLabel(value, options) {
+  const normalized = normalizePaperType(value, options);
+  return options.find((option) => option.id === normalized)?.label || "";
+}
+
+function publicationTypeLabel(value) {
+  return paperTypeLabel(value, PUBLICATION_TYPES);
+}
+
+function contentTypeLabel(value) {
+  return paperTypeLabel(value, CONTENT_TYPES);
+}
+
+function inferPaperTypes(metadata = {}) {
+  const publicationType = normalizePublicationType(
+    metadata.publicationType || metadata.publication_type || metadata.itemType || metadata.item_type || metadata.type
+  );
+  const contentType = normalizeContentType(
+    metadata.contentType || metadata.content_type || metadata.articleType || metadata.article_type || metadata.subtype
+  );
+  const title = String(metadata.title || "").normalize("NFKC");
+  const venue = String(metadata.venue || metadata.journal || metadata.publisher || "").normalize("NFKC");
+  const source = `${title} ${venue}`.toLocaleLowerCase();
+  let inferredPublicationType = publicationType;
+  let inferredContentType = contentType;
+  if (!inferredPublicationType) {
+    if (/\b(?:ph\.?d\.?|doctoral|master'?s?)\s+(?:dissertation|thesis)\b|博士(?:学位)?论文|硕士(?:学位)?论文|学位论文/i.test(source)) inferredPublicationType = "thesis";
+    else if (/\b(?:arxiv|biorxiv|medrxiv|preprint)\b|预印本/i.test(source) || metadata.arxiv) inferredPublicationType = "preprint";
+    else if (/\b(?:conference|proceedings|symposium|workshop)\b|会议论文集/i.test(venue)) inferredPublicationType = "conference-paper";
+    else if (venue) inferredPublicationType = "journal-article";
+  }
+  if (!inferredContentType) {
+    if (/\b(?:systematic review|meta[- ]analysis|meta[- ]analytic)\b|系统综述|荟萃分析/i.test(title)) inferredContentType = "systematic-review";
+    else if (/\b(?:review|survey)\b|综述|述评/i.test(title)) inferredContentType = "review";
+    else if (/\b(?:protocol|methodology|methods?)\b|实验方案|研究方案|方法学/i.test(title)) inferredContentType = "methods-protocol";
+    else if (/\b(?:perspective|commentary|editorial|opinion)\b|观点|评论|社论/i.test(title)) inferredContentType = "perspective-commentary";
+    else if (/\b(?:dataset|benchmark|data descriptor|data paper)\b|数据集|基准测试/i.test(title)) inferredContentType = "dataset-benchmark";
+  }
+  return { publicationType: inferredPublicationType, contentType: inferredContentType };
+}
 
 function normalizeFavoriteColor(value) {
   const id = String(value || "").toLocaleLowerCase();
@@ -947,6 +1031,7 @@ const DEFAULT_SETTINGS = {
   semanticScholarPaperCacheVersion: "s2-paper-cache-v1",
   paperDeletionTombstones: {},
   obsidianTagNormalizationVersion: 1,
+  paperTypeMetadataVersion: 1,
   libraryAppearance: "standard",
   // 移动端独立外观；空字符串表示尚未单独设置（加载时继承桌面端选择）。
   libraryAppearanceMobile: "",
@@ -2259,6 +2344,8 @@ class PaperLibraryView extends ItemView {
     super(leaf);
     this.plugin = plugin;
     this.query = "";
+    this.publicationTypeFilter = "";
+    this.contentTypeFilter = "";
     this.sortKey = "addedAt";
     this.sortDirection = "desc";
     this.paperglassRankOnly = false;
@@ -2330,11 +2417,19 @@ class PaperLibraryView extends ItemView {
       const tag = this.scope.slice("tag:".length);
       papers = papers.filter((paper) => paper.tags.includes(tag));
     }
+    if (this.publicationTypeFilter) {
+      papers = papers.filter((paper) => normalizePublicationType(paper.publicationType) === this.publicationTypeFilter);
+    }
+    if (this.contentTypeFilter) {
+      papers = papers.filter((paper) => normalizeContentType(paper.contentType) === this.contentTypeFilter);
+    }
     if (q) {
       papers = papers.filter((paper) => [
         paper.title,
         paper.venue,
         paper.abstract,
+        publicationTypeLabel(paper.publicationType),
+        contentTypeLabel(paper.contentType),
         this.plugin.formatVenueRanksInput(this.plugin.getPaperVenueRanks(paper)),
         ...paper.authors,
         ...paper.tags,
@@ -2360,6 +2455,9 @@ class PaperLibraryView extends ItemView {
       } else if (this.sortKey === "attachment") {
         left = a.pdfPath ? "1" : "0";
         right = b.pdfPath ? "1" : "0";
+      } else if (this.sortKey === "type") {
+        left = `${publicationTypeLabel(a.publicationType)} ${contentTypeLabel(a.contentType)}`;
+        right = `${publicationTypeLabel(b.publicationType)} ${contentTypeLabel(b.contentType)}`;
       }
       const value = String(left).localeCompare(String(right), undefined, { numeric: true });
       return this.sortDirection === "asc" ? value : -value;
@@ -3089,6 +3187,27 @@ class PaperLibraryView extends ItemView {
       this.renderTable(main);
       severanceCount.setText(String(this.getFilteredPapers().length).padStart(3, "0"));
     });
+    const typeFilters = toolbar.createDiv({ cls: "paperlib-type-filters" });
+    const createTypeFilter = (label, value, options, onChange) => {
+      const select = typeFilters.createEl("select", {
+        cls: "paperlib-type-filter",
+        attr: { "aria-label": label, title: label }
+      });
+      select.createEl("option", { value: "", text: label });
+      options.forEach((option) => select.createEl("option", { value: option.id, text: option.label }));
+      select.value = value;
+      select.addEventListener("change", () => {
+        onChange(select.value);
+        this.renderTable();
+        severanceCount.setText(String(this.getFilteredPapers().length).padStart(3, "0"));
+      });
+    };
+    createTypeFilter("全部载体", this.publicationTypeFilter, PUBLICATION_TYPES, (value) => {
+      this.publicationTypeFilter = value;
+    });
+    createTypeFilter("全部内容", this.contentTypeFilter, CONTENT_TYPES, (value) => {
+      this.contentTypeFilter = value;
+    });
     if (appearanceBase === "paperglass" && !this.plugin.isMobileApp()) {
       this.renderPaperglassToolbarControls(toolbar);
     }
@@ -3813,6 +3932,12 @@ class PaperLibraryView extends ItemView {
     const flag = bar.createEl("button", { cls: "paperlib-batch-action", text: allFlagged ? "取消标记" : "标记" });
     flag.disabled = !checked.length;
     flag.addEventListener("click", () => void this.setCheckedPapersFlag("flagged", !allFlagged));
+    const type = bar.createEl("button", { cls: "paperlib-batch-action", text: "设置类型" });
+    type.disabled = !checked.length;
+    type.addEventListener("click", () => {
+      if (!checked.length) return;
+      new BatchPaperTypeModal(this.app, this.plugin, checked, () => this.renderTable()).open();
+    });
     const remove = bar.createEl("button", { cls: "paperlib-batch-action mod-warning", text: "删除" });
     remove.disabled = !checked.length;
     remove.addEventListener("click", () => {
@@ -4194,6 +4319,15 @@ class PaperLibraryView extends ItemView {
       row.createSpan({ cls: "paperlib-cell paperlib-title", text: paper.title });
       return;
     }
+    if (key === "type") {
+      const cell = row.createSpan({ cls: "paperlib-cell paperlib-type" });
+      const publication = publicationTypeLabel(paper.publicationType);
+      const content = contentTypeLabel(paper.contentType);
+      if (!publication && !content) cell.createSpan({ cls: "paperlib-type-empty", text: "—" });
+      if (publication) cell.createSpan({ cls: "paperlib-type-badge is-publication", text: publication });
+      if (content) cell.createSpan({ cls: "paperlib-type-badge is-content", text: content });
+      return;
+    }
     if (key === "rating") {
       const rating = Math.max(0, Math.min(5, Math.round(Number(paper.rating) || 0)));
       const cell = row.createSpan({
@@ -4250,6 +4384,8 @@ class PaperLibraryView extends ItemView {
     clip.toggleClass("is-importing", Boolean(importing));
     eyebrow.createSpan({ cls: "paperlib-pg-venue", text: venueShort });
     if (venueFull) eyebrow.createSpan({ cls: "paperlib-pg-venue-full", text: `· ${venueFull}` });
+    const publication = publicationTypeLabel(paper.publicationType);
+    if (publication) eyebrow.createSpan({ cls: "paperlib-pg-type", text: publication });
     main.createSpan({ cls: "paperlib-pg-title", text: paper.title });
     const authorPreview = paper.authors.slice(0, 3).join(", ") + (paper.authors.length > 3 ? " …" : "");
     main.createSpan({ cls: "paperlib-pg-authors", text: authorPreview || "—" });
@@ -4356,6 +4492,10 @@ class PaperLibraryView extends ItemView {
         .setTitle(`标记 ${checked.length} 篇论文`)
         .setIcon("flag")
         .onClick(() => void this.setCheckedPapersFlag("flagged", true)));
+      menu.addItem((item) => item
+        .setTitle(`设置 ${checked.length} 篇论文的类型`)
+        .setIcon("tags")
+        .onClick(() => new BatchPaperTypeModal(this.app, this.plugin, checked, () => this.renderTable()).open()));
       menu.addSeparator();
       menu.addItem((item) => item
         .setTitle(`删除 ${checked.length} 篇论文`)
@@ -4704,6 +4844,12 @@ class PaperLibraryView extends ItemView {
     }
     infoHeader.createEl("h1", { cls: "paperlib-detail-title", text: paper.title });
     infoHeader.createDiv({ cls: "paperlib-detail-authors", text: paper.authors.join(" · ") });
+    const typeSummary = infoHeader.createDiv({ cls: "paperlib-type-summary" });
+    const publication = publicationTypeLabel(paper.publicationType);
+    const content = contentTypeLabel(paper.contentType);
+    if (publication) typeSummary.createSpan({ cls: "paperlib-type-badge is-publication", text: publication });
+    if (content) typeSummary.createSpan({ cls: "paperlib-type-badge is-content", text: content });
+    if (!publication && !content) typeSummary.remove();
 
     const abstractBlock = scroll.createDiv({ cls: "paperlib-abstract" });
     const abstractTitle = abstractBlock.createDiv({ cls: "paperlib-abstract-title" });
@@ -4853,6 +4999,8 @@ class PaperLibraryView extends ItemView {
       authors: (paper.authors || []).join("; "),
       year: String(paper.year || ""),
       venue: paper.venue || "",
+      publicationType: normalizePublicationType(paper.publicationType),
+      contentType: normalizeContentType(paper.contentType),
       venueRanks: this.plugin.formatVenueRanksInput(paper.venueRanks),
       abstract: paper.abstract || "",
       doi: paper.doi || "",
@@ -4872,6 +5020,15 @@ class PaperLibraryView extends ItemView {
       input.addEventListener("input", () => { draft[key] = input.value; });
       return input;
     };
+    const selectField = (parent, label, key, options) => {
+      const wrap = parent.createDiv({ cls: "paperlib-editor-field" });
+      wrap.createEl("label", { text: label });
+      const select = wrap.createEl("select");
+      select.createEl("option", { value: "", text: "未指定" });
+      options.forEach((option) => select.createEl("option", { value: option.id, text: option.label }));
+      select.value = draft[key];
+      select.addEventListener("change", () => { draft[key] = select.value; });
+    };
     field("标题", "title");
     field("作者", "authors");
     const pair = scroll.createDiv({ cls: "paperlib-editor-pair" });
@@ -4883,6 +5040,9 @@ class PaperLibraryView extends ItemView {
     };
     compactField(pair, "年份", "year");
     compactField(pair, "期刊 / 会议", "venue");
+    const typePair = scroll.createDiv({ cls: "paperlib-editor-pair" });
+    selectField(typePair, "出版载体", "publicationType", PUBLICATION_TYPES);
+    selectField(typePair, "内容类型", "contentType", CONTENT_TYPES);
     field("期刊 / 会议等级", "venueRanks", { placeholder: "例如：CCF:A；JCR:Q1；中科院:1区" });
     field("摘要", "abstract", { area: true, rows: 7 });
     this.renderEditorChoices(scroll, "Tags", "tag", this.plugin.getAllTags(), selectedTags);
@@ -4908,6 +5068,8 @@ class PaperLibraryView extends ItemView {
         authors: draft.authors.split(";").map((value) => value.trim()).filter(Boolean),
         year: Number.parseInt(draft.year, 10) || 0,
         venue: draft.venue.trim(),
+        publicationType: normalizePublicationType(draft.publicationType),
+        contentType: normalizeContentType(draft.contentType),
         venueRanks: this.plugin.parseVenueRanksInput(draft.venueRanks),
         abstract: draft.abstract.trim(),
         tags: [...selectedTags],
@@ -4930,6 +5092,7 @@ class PaperLibraryView extends ItemView {
         console.error("Paper Library: failed to reorganize edited paper", error);
         new Notice(`论文信息已保存，但文件整理失败：${error.message || error}`);
       }
+      if (paper.notePath) await this.plugin.syncPaperNoteTags(paper);
       await this.plugin.saveSettings();
       this.plugin.uiState.detailTab = "info";
       this.plugin.refreshPaperTableViews();
@@ -7616,6 +7779,7 @@ class PaperFormModal extends Modal {
     this.pendingPdf = draft?.pendingPdf || null;
     this.autoOrganizePdf = Boolean(draft?.autoOrganizePdf);
     const source = paper || draft || {};
+    const inferredTypes = inferPaperTypes(source);
     this.lookupMetadata = {
       semanticScholarPaperId: source.semanticScholarPaperId || "",
       serpApiResultId: source.serpApiResultId || "",
@@ -7629,6 +7793,8 @@ class PaperFormModal extends Modal {
       authors: Array.isArray(source.authors) ? source.authors.join("; ") : String(source.authors || ""),
       year: source.year ? String(source.year) : "",
       venue: source.venue || "",
+      publicationType: normalizePublicationType(source.publicationType) || inferredTypes.publicationType,
+      contentType: normalizeContentType(source.contentType) || inferredTypes.contentType,
       volume: source.volume || "",
       issue: source.issue || "",
       pages: source.pages || "",
@@ -7661,6 +7827,18 @@ class PaperFormModal extends Modal {
       });
   }
 
+  selectField(content, label, key, options) {
+    new Setting(content)
+      .setName(label)
+      .addDropdown((dropdown) => {
+        this.inputs[key] = dropdown;
+        dropdown.addOption("", "未指定");
+        options.forEach((option) => dropdown.addOption(option.id, option.label));
+        dropdown.setValue(this.values[key]);
+        dropdown.onChange((value) => { this.values[key] = value; });
+      });
+  }
+
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass("paperlib-modal");
@@ -7675,6 +7853,8 @@ class PaperFormModal extends Modal {
     this.field(contentEl, "Authors", "authors");
     this.field(contentEl, "Year", "year");
     this.field(contentEl, "Venue", "venue");
+    this.selectField(contentEl, "Publication type", "publicationType", PUBLICATION_TYPES);
+    this.selectField(contentEl, "Content type", "contentType", CONTENT_TYPES);
     this.field(contentEl, "Volume", "volume", "卷，例如 384");
     this.field(contentEl, "Issue", "issue", "期，例如 7");
     this.field(contentEl, "Pages", "pages", "页码，例如 610-618");
@@ -7717,6 +7897,8 @@ class PaperFormModal extends Modal {
         authors: this.values.authors.split(";").map((value) => value.trim()).filter(Boolean),
         year: Number.parseInt(this.values.year, 10) || 0,
         venue: this.values.venue.trim(),
+        publicationType: normalizePublicationType(this.values.publicationType),
+        contentType: normalizeContentType(this.values.contentType),
         venueRanks: this.plugin.parseVenueRanksInput(this.values.venueRanks),
         abstract: this.values.abstract.trim(),
         tags: normalizePaperTags(this.values.tags.split(",")),
@@ -7731,6 +7913,7 @@ class PaperFormModal extends Modal {
         return new Notice("没有匹配到论文信息");
       }
       const merged = this.plugin.mergePaperMetadata(current, remote);
+      const inferredTypes = inferPaperTypes({ ...current, ...remote, ...merged });
       Object.assign(this.lookupMetadata, {
         semanticScholarPaperId: merged.semanticScholarPaperId || "",
         serpApiResultId: merged.serpApiResultId || "",
@@ -7743,6 +7926,8 @@ class PaperFormModal extends Modal {
         authors: (merged.authors || []).join("; "),
         year: String(merged.year || this.values.year),
         venue: merged.venue || this.values.venue,
+        publicationType: this.values.publicationType || normalizePublicationType(merged.publicationType) || inferredTypes.publicationType,
+        contentType: this.values.contentType || normalizeContentType(merged.contentType) || inferredTypes.contentType,
         volume: merged.volume || this.values.volume,
         issue: merged.issue || this.values.issue,
         pages: merged.pages || this.values.pages,
@@ -7752,7 +7937,7 @@ class PaperFormModal extends Modal {
         doi: normalizeDoiInput(merged.doi),
         arxiv: merged.arxiv || this.values.arxiv
       });
-      ["title", "authors", "year", "venue", "volume", "issue", "pages", "journalAbbreviation", "abstract", "tags", "doi", "arxiv"].forEach((key) => {
+      ["title", "authors", "year", "venue", "publicationType", "contentType", "volume", "issue", "pages", "journalAbbreviation", "abstract", "tags", "doi", "arxiv"].forEach((key) => {
         this.inputs[key]?.setValue(this.values[key]);
       });
       this.initialIdentity = {
@@ -7785,6 +7970,8 @@ class PaperFormModal extends Modal {
       authors: this.values.authors.split(";").map((item) => item.trim()).filter(Boolean),
       year: Number.parseInt(this.values.year, 10) || 0,
       venue: this.values.venue.trim(),
+      publicationType: normalizePublicationType(this.values.publicationType),
+      contentType: normalizeContentType(this.values.contentType),
       volume: this.values.volume.trim(),
       issue: this.values.issue.trim(),
       pages: this.values.pages.trim(),
@@ -7857,6 +8044,66 @@ class PaperFormModal extends Modal {
 }
 
 class AddPaperModal extends PaperFormModal {}
+
+class BatchPaperTypeModal extends Modal {
+  constructor(app, plugin, papers, onDone = null) {
+    super(app);
+    this.plugin = plugin;
+    this.papers = Array.from(papers || []);
+    this.onDone = onDone;
+    this.values = { publicationType: "__keep__", contentType: "__keep__" };
+  }
+
+  addTypeSetting(content, label, key, options) {
+    new Setting(content).setName(label).addDropdown((dropdown) => {
+      dropdown.addOption("__keep__", "保持不变");
+      dropdown.addOption("", "未指定");
+      options.forEach((option) => dropdown.addOption(option.id, option.label));
+      dropdown.setValue(this.values[key]);
+      dropdown.onChange((value) => { this.values[key] = value; });
+    });
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("paperlib-modal");
+    contentEl.createEl("h2", { text: "批量设置文献类型" });
+    contentEl.createEl("p", {
+      cls: "paperlib-modal-intro",
+      text: `将修改已选择的 ${this.papers.length} 篇论文。两个维度可以分别设置。`
+    });
+    this.addTypeSetting(contentEl, "出版载体", "publicationType", PUBLICATION_TYPES);
+    this.addTypeSetting(contentEl, "内容类型", "contentType", CONTENT_TYPES);
+    const buttons = contentEl.createDiv({ cls: "paperlib-modal-buttons" });
+    buttons.createEl("button", { text: "取消" }).addEventListener("click", () => this.close());
+    buttons.createEl("button", { cls: "mod-cta", text: "应用" }).addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      if (this.values.publicationType === "__keep__" && this.values.contentType === "__keep__") {
+        return new Notice("请选择至少一种要修改的类型");
+      }
+      button.disabled = true;
+      for (const paper of this.papers) {
+        if (this.values.publicationType !== "__keep__") {
+          paper.publicationType = normalizePublicationType(this.values.publicationType);
+        }
+        if (this.values.contentType !== "__keep__") {
+          paper.contentType = normalizeContentType(this.values.contentType);
+        }
+        if (paper.notePath) {
+          try { await this.plugin.syncPaperNoteTags(paper); }
+          catch (error) { console.warn(`Paper Library: failed to sync paper types for ${paper.title}`, error); }
+        }
+      }
+      await this.plugin.saveSettings();
+      this.plugin.refreshPaperPresentation({ table: true, detail: true });
+      this.onDone?.();
+      new Notice(`已更新 ${this.papers.length} 篇论文的类型`);
+      this.close();
+    });
+  }
+
+  onClose() { this.contentEl.empty(); }
+}
 
 class TagModal extends Modal {
   constructor(app, plugin, oldName = "") {
@@ -13372,6 +13619,9 @@ module.exports = class PaperLibraryPlugin extends Plugin {
       paper.figureCatalogs = paper.figureCatalogs && typeof paper.figureCatalogs === "object"
         && !Array.isArray(paper.figureCatalogs) ? paper.figureCatalogs : {};
       paper.venueRanks = this.normalizeVenueRanks(paper.venueRanks);
+      const inferredTypes = inferPaperTypes(paper);
+      paper.publicationType = normalizePublicationType(paper.publicationType) || inferredTypes.publicationType;
+      paper.contentType = normalizeContentType(paper.contentType) || inferredTypes.contentType;
       paper.favoriteColor = normalizeFavoriteColor(paper.favoriteColor);
       paper.tags = normalizePaperTags(paper.tags);
       paper.collections = [...new Set((Array.isArray(paper.collections) ? paper.collections : [])
@@ -13400,6 +13650,14 @@ module.exports = class PaperLibraryPlugin extends Plugin {
         catch (error) { console.warn(`Paper Library: failed to normalize note tags for ${paper.title}`, error); }
       }
       this.settings.obsidianTagNormalizationVersion = 1;
+      await this.saveData(this.settings);
+    }
+    if ((stored?.paperTypeMetadataVersion || 0) < 1) {
+      for (const paper of this.settings.papers) {
+        try { await this.syncPaperNoteTags(paper); }
+        catch (error) { console.warn(`Paper Library: failed to sync note types for ${paper.title}`, error); }
+      }
+      this.settings.paperTypeMetadataVersion = 1;
       await this.saveData(this.settings);
     }
     this.settings.collections = expandCollectionPaths([
@@ -17190,6 +17448,12 @@ module.exports = class PaperLibraryPlugin extends Plugin {
     paper.tags = tags;
     await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
       frontmatter.tags = [...tags];
+      const publicationType = normalizePublicationType(paper.publicationType);
+      const contentType = normalizeContentType(paper.contentType);
+      if (publicationType) frontmatter.publication_type = publicationType;
+      else delete frontmatter.publication_type;
+      if (contentType) frontmatter.content_type = contentType;
+      else delete frontmatter.content_type;
     });
     return true;
   }
@@ -17638,6 +17902,8 @@ module.exports = class PaperLibraryPlugin extends Plugin {
       authors: [],
       year: 0,
       venue: "",
+      publicationType: "",
+      contentType: "",
       venueRanks: [],
       abstract: "",
       tags: [],
@@ -17662,11 +17928,25 @@ module.exports = class PaperLibraryPlugin extends Plugin {
     const previousTitle = paper.title;
     const previousDoi = paper.doi;
     const merged = this.mergePaperMetadata(paper, metadata);
+    const inferredTypes = inferPaperTypes({ ...paper, ...metadata, ...merged });
+    const existingPublicationType = normalizePublicationType(paper.publicationType);
+    const existingContentType = normalizeContentType(paper.contentType);
+    const incomingPublicationType = normalizePublicationType(
+      metadata.publicationType || metadata.publication_type || metadata.itemType || metadata.type || merged.publicationType
+    );
+    const incomingContentType = normalizeContentType(
+      metadata.contentType || metadata.content_type || metadata.articleType || metadata.subtype || merged.contentType
+    );
+    const importing = Boolean(paper.importStatus);
     Object.assign(paper, {
       title: merged.title || paper.title,
       authors: Array.isArray(merged.authors) ? merged.authors.filter(Boolean) : (paper.authors || []),
       year: Number(merged.year) || Number(paper.year) || 0,
       venue: merged.venue || paper.venue || "",
+      publicationType: (importing ? incomingPublicationType : existingPublicationType)
+        || existingPublicationType || incomingPublicationType || inferredTypes.publicationType,
+      contentType: (importing ? incomingContentType : existingContentType)
+        || existingContentType || incomingContentType || inferredTypes.contentType,
       journalAbbreviation: merged.journalAbbreviation || paper.journalAbbreviation || "",
       volume: merged.volume || paper.volume || "",
       issue: merged.issue || paper.issue || "",
@@ -20589,6 +20869,7 @@ module.exports = class PaperLibraryPlugin extends Plugin {
         title: "", authors: [], year: 0, venue: "",
         abstract: "", tags: [], doi: "", arxiv: ""
       }, remote);
+      const inferredTypes = inferPaperTypes({ ...paper, ...local, ...remote, ...merged });
       const filled = [];
       const fillField = (key, value) => {
         if (String(paper[key] ?? "").trim() || !String(value ?? "").trim()) return;
@@ -20615,6 +20896,8 @@ module.exports = class PaperLibraryPlugin extends Plugin {
         if (shouldReplaceAmbiguousVenue) paper.venueRanks = [];
         filled.push("venue");
       } else fillField("venue", merged.venue);
+      fillField("publicationType", normalizePublicationType(merged.publicationType) || inferredTypes.publicationType);
+      fillField("contentType", normalizeContentType(merged.contentType) || inferredTypes.contentType);
       const existingArxivDoi = arxivIdFromDoi(paper.doi);
       if (existingArxivDoi && !merged.doi) {
         paper.doi = "";
@@ -20668,7 +20951,7 @@ module.exports = class PaperLibraryPlugin extends Plugin {
       const labels = {
         abstract: "摘要", title: "标题", venue: "期刊/会议", doi: "DOI",
         arxiv: "arXiv ID", year: "年份", authors: "作者", tags: "标签",
-        venueRanks: "期刊/会议等级"
+        publicationType: "出版载体", contentType: "内容类型", venueRanks: "期刊/会议等级"
       };
       progress.hide?.();
       new Notice(filled.length
@@ -20739,6 +21022,10 @@ module.exports = class PaperLibraryPlugin extends Plugin {
         ? local.year
         : (remote.year || (isPlausiblePaperYear(local.year, localArxiv) ? local.year : yearFromArxivId(localArxiv))),
       venue: localVenueIsMoreSpecific ? local.venue : choose("venue"),
+      publicationType: normalizePublicationType(remote.publicationType || remote.publication_type || remote.itemType || remote.type)
+        || normalizePublicationType(local.publicationType),
+      contentType: normalizeContentType(remote.contentType || remote.content_type || remote.articleType || remote.subtype)
+        || normalizeContentType(local.contentType),
       journalAbbreviation: choose("journalAbbreviation"),
       volume: choose("volume"),
       issue: choose("issue"),
@@ -21258,6 +21545,10 @@ module.exports = class PaperLibraryPlugin extends Plugin {
       authors: [...(paper.authors || [])],
       year: paper.year || "",
       venue: paper.venue || "",
+      publicationType: normalizePublicationType(paper.publicationType),
+      publicationTypeLabel: publicationTypeLabel(paper.publicationType),
+      contentType: normalizeContentType(paper.contentType),
+      contentTypeLabel: contentTypeLabel(paper.contentType),
       volume: paper.volume || "",
       issue: paper.issue || "",
       pages: paper.pages || "",
@@ -21281,29 +21572,59 @@ module.exports = class PaperLibraryPlugin extends Plugin {
   }
 
   buildBibTeX(paper) {
-    const conference = /\b(?:conference|proceedings|nips|neurips|icml|iclr|cvpr|eccv|iccv|hpca)\b/i.test(paper.venue || "");
+    const inferred = inferPaperTypes(paper);
+    const publicationType = normalizePublicationType(paper.publicationType) || inferred.publicationType || "journal-article";
+    const entryType = ({
+      "journal-article": "article",
+      "conference-paper": "inproceedings",
+      thesis: "phdthesis",
+      book: "book",
+      "book-chapter": "inbook",
+      "technical-report": "techreport",
+      preprint: "article",
+      patent: "misc",
+      standard: "misc",
+      other: "misc"
+    })[publicationType] || "misc";
+    const venueField = entryType === "inproceedings" || entryType === "inbook"
+      ? "booktitle"
+      : entryType === "book" ? "publisher"
+        : entryType === "phdthesis" ? "school"
+          : entryType === "techreport" ? "institution"
+            : entryType === "misc" ? "howpublished" : "journal";
+    const keywords = [...(paper.tags || [])];
+    if (normalizeContentType(paper.contentType)) keywords.push(`content-type:${normalizeContentType(paper.contentType)}`);
     const fields = [
       ["title", `{${String(paper.title || "").replace(/[{}]/g, "")}}`],
       ["author", `{${(paper.authors || []).join(" and ")}}`],
       ["year", `{${paper.year || ""}}`],
-      [conference ? "booktitle" : "journal", `{${String(paper.venue || "").replace(/[{}]/g, "")}}`],
+      [venueField, `{${String(paper.venue || "").replace(/[{}]/g, "")}}`],
+      keywords.length ? ["keywords", `{${keywords.join(", ").replace(/[{}]/g, "")}}`] : null,
       paper.doi ? ["doi", `{${normalizeDoiInput(paper.doi)}}`] : null,
       paper.arxiv ? ["eprint", `{${paper.arxiv}}`] : null,
       paper.arxiv ? ["archivePrefix", `{arXiv}`] : null,
       paper.abstract ? ["abstract", `{${String(paper.abstract).replace(/[{}]/g, "")}}`] : null
     ].filter((field) => field && field[1] !== "{}");
-    return `@${conference ? "inproceedings" : "article"}{${this.citationKey(paper)},\n${fields.map(([key, value]) => `  ${key} = ${value}`).join(",\n")}\n}\n`;
+    return `@${entryType}{${this.citationKey(paper)},\n${fields.map(([key, value]) => `  ${key} = ${value}`).join(",\n")}\n}\n`;
   }
 
   buildRis(paper) {
+    const inferred = inferPaperTypes(paper);
+    const publicationType = normalizePublicationType(paper.publicationType) || inferred.publicationType || "other";
+    const risType = ({
+      "journal-article": "JOUR", "conference-paper": "CPAPER", thesis: "THES", patent: "PAT",
+      preprint: "ELEC", book: "BOOK", "book-chapter": "CHAP", "technical-report": "RPRT",
+      standard: "STAND", other: "GEN"
+    })[publicationType] || "GEN";
     const lines = [
-      `TY  - ${/\b(?:conference|proceedings|nips|neurips|hpca)\b/i.test(paper.venue || "") ? "CPAPER" : "JOUR"}`,
+      `TY  - ${risType}`,
       `TI  - ${paper.title || ""}`,
       ...(paper.authors || []).map((author) => `AU  - ${author}`),
       `PY  - ${paper.year || ""}`,
       paper.venue ? `T2  - ${paper.venue}` : "",
       paper.doi ? `DO  - ${normalizeDoiInput(paper.doi)}` : "",
       paper.abstract ? `AB  - ${String(paper.abstract).replace(/\s+/g, " ")}` : "",
+      normalizeContentType(paper.contentType) ? `M3  - ${normalizeContentType(paper.contentType)}` : "",
       ...(paper.tags || []).map((tag) => `KW  - ${tag}`),
       paper.pdfPath ? `L1  - ${paper.pdfPath}` : "",
       "ER  - "
@@ -21313,16 +21634,16 @@ module.exports = class PaperLibraryPlugin extends Plugin {
 
   buildCsv(paper) {
     const record = this.getPaperExportRecord(paper);
-    const headers = ["Title", "Authors", "Year", "Venue", "Venue Rankings", "DOI", "arXiv", "Tags", "Collections", "PDF Path", "Note Path", "Abstract"];
-    const values = [record.title, record.authors.join("; "), record.year, record.venue, this.formatVenueRanksInput(record.venueRanks), record.doi, record.arxiv,
+    const headers = ["Title", "Authors", "Year", "Venue", "Publication Type", "Content Type", "Venue Rankings", "DOI", "arXiv", "Tags", "Collections", "PDF Path", "Note Path", "Abstract"];
+    const values = [record.title, record.authors.join("; "), record.year, record.venue, record.publicationType, record.contentType, this.formatVenueRanksInput(record.venueRanks), record.doi, record.arxiv,
       record.tags.join("; "), record.collections.join("; "), record.pdfPath, record.notePath, record.abstract];
     return `\ufeff${headers.map(csvEscape).join(",")}\r\n${values.map(csvEscape).join(",")}\r\n`;
   }
 
   buildXlsx(paper) {
     const record = this.getPaperExportRecord(paper);
-    const headers = ["Title", "Authors", "Year", "Venue", "Venue Rankings", "DOI", "arXiv", "Tags", "Collections", "PDF Path", "Note Path", "Abstract"];
-    const values = [record.title, record.authors.join("; "), record.year, record.venue, this.formatVenueRanksInput(record.venueRanks), record.doi, record.arxiv,
+    const headers = ["Title", "Authors", "Year", "Venue", "Publication Type", "Content Type", "Venue Rankings", "DOI", "arXiv", "Tags", "Collections", "PDF Path", "Note Path", "Abstract"];
+    const values = [record.title, record.authors.join("; "), record.year, record.venue, record.publicationType, record.contentType, this.formatVenueRanksInput(record.venueRanks), record.doi, record.arxiv,
       record.tags.join("; "), record.collections.join("; "), record.pdfPath, record.notePath, record.abstract];
     const cell = (value, column, row) => `<c r="${column}${row}" t="inlineStr"><is><t xml:space="preserve">${xmlEscape(value)}</t></is></c>`;
     const columns = headers.map((_, index) => String.fromCharCode(65 + index));
@@ -22594,6 +22915,8 @@ module.exports = class PaperLibraryPlugin extends Plugin {
       authors: splitList(fm.authors || fm.author),
       year: Number(fm.year) || new Date().getFullYear(),
       venue: String(fm.venue || fm.journal || ""),
+      publicationType: normalizePublicationType(fm.publication_type || fm.publicationType || fm.itemType || fm.type),
+      contentType: normalizeContentType(fm.content_type || fm.contentType || fm.articleType),
       venueRanks: this.normalizeVenueRanks(fm.venue_rankings || fm.venueRanks),
       abstract: String(fm.abstract || ""),
       tags: importedTags,
@@ -22603,6 +22926,9 @@ module.exports = class PaperLibraryPlugin extends Plugin {
       pdfPath: String(fm.pdf || ""), notePath: file.path, attachments: [],
       addedAt: new Date().toISOString(), lastOpened: ""
     };
+    const inferredTypes = inferPaperTypes(importedPaper);
+    importedPaper.publicationType ||= inferredTypes.publicationType;
+    importedPaper.contentType ||= inferredTypes.contentType;
     try { await this.enrichPaperVenueRanks(importedPaper); }
     catch (error) { console.warn("Paper Library: venue rank lookup unavailable", error); }
     this.settings.papers.unshift(importedPaper);
@@ -22638,7 +22964,7 @@ module.exports = class PaperLibraryPlugin extends Plugin {
       const heading = this.settings.annotationHeading || "PDF Annotations";
       const rankLabels = this.getPaperVenueRanks(paper).map(({ system, rank }) => `${system}:${rank}`);
       paper.tags = normalizePaperTags(paper.tags);
-      const body = `---\ntitle: "${paper.title.replace(/"/g, "\\\"")}"\nauthors:\n${yamlList(paper.authors)}\nyear: ${paper.year}\nvenue: "${paper.venue.replace(/"/g, "\\\"")}"\nvenue_rankings:\n${yamlList(rankLabels)}\ntags:\n${yamlList(paper.tags)}\ncollections:\n${yamlList(paper.collections)}\ndoi: "${paper.doi}"\narxiv: "${paper.arxiv}"\npdf: "${paper.pdfPath}"\nrating: ${paper.rating}\n---\n\n# ${paper.title}\n\n## Abstract\n\n${paper.abstract}\n\n## Notes\n\n## ${heading}\n\n`;
+      const body = `---\ntitle: "${paper.title.replace(/"/g, "\\\"")}"\nauthors:\n${yamlList(paper.authors)}\nyear: ${paper.year}\nvenue: "${paper.venue.replace(/"/g, "\\\"")}"\npublication_type: "${normalizePublicationType(paper.publicationType)}"\ncontent_type: "${normalizeContentType(paper.contentType)}"\nvenue_rankings:\n${yamlList(rankLabels)}\ntags:\n${yamlList(paper.tags)}\ncollections:\n${yamlList(paper.collections)}\ndoi: "${paper.doi}"\narxiv: "${paper.arxiv}"\npdf: "${paper.pdfPath}"\nrating: ${paper.rating}\n---\n\n# ${paper.title}\n\n## Abstract\n\n${paper.abstract}\n\n## Notes\n\n## ${heading}\n\n`;
       file = await this.app.vault.create(path, body);
       paper.notePath = path;
       await this.saveSettings();
