@@ -14634,6 +14634,10 @@ module.exports = class PaperLibraryPlugin extends Plugin {
     const normalized = (Array.isArray(order) ? order : [])
       .map((key) => String(key || ""))
       .filter((key, index, values) => known.has(key) && values.indexOf(key) === index);
+    if (normalized.length && !normalized.includes("type")) {
+      const titleIndex = normalized.indexOf("title");
+      normalized.splice(titleIndex >= 0 ? titleIndex + 1 : normalized.length, 0, "type");
+    }
     DEFAULT_PAPER_TABLE_COLUMN_ORDER.forEach((key) => {
       if (!normalized.includes(key)) normalized.push(key);
     });

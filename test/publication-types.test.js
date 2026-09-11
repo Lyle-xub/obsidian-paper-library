@@ -18,6 +18,11 @@ Module._load = originalLoad;
 const plugin = Object.create(PaperLibraryPlugin.prototype);
 plugin.settings = { tags: [], conferenceRankingDatabase: { conferences: [] } };
 
+assert.deepEqual(
+  plugin.normalizePaperTableColumnOrder(["favorite", "attachment", "authors", "year", "title", "rating", "venue", "rankings"]),
+  ["favorite", "attachment", "authors", "year", "title", "type", "rating", "venue", "rankings"]
+);
+
 const makePaper = (overrides = {}) => ({
   title: "Untitled paper", authors: [], year: 0, venue: "", abstract: "", tags: [],
   collections: [], doi: "", arxiv: "", ...overrides
