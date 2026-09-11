@@ -44,6 +44,21 @@ plugin.applyBatchImportMetadata(review, {
 assert.equal(review.publicationType, "journal-article");
 assert.equal(review.contentType, "systematic-review");
 
+const classifiedThesis = makePaper({
+  title: "磁耦合无线电能传输系统研究与应用",
+  venue: "重庆邮电大学",
+  collections: ["超声加工/01-4 学位论文"]
+});
+plugin.applyBatchImportMetadata(classifiedThesis, classifiedThesis, "本地资料库");
+assert.equal(classifiedThesis.publicationType, "thesis", "collection names should disambiguate theses from journal articles");
+
+const classifiedReview = makePaper({
+  title: "磁耦合谐振式无线电能传输特性研究动态",
+  collections: ["超声加工/01-3 综述"]
+});
+plugin.applyBatchImportMetadata(classifiedReview, classifiedReview, "本地资料库");
+assert.equal(classifiedReview.contentType, "review", "collection names should contribute to content-type inference");
+
 const manual = makePaper({ publicationType: "thesis" });
 plugin.applyBatchImportMetadata(manual, { title: "A published version", itemType: "journalArticle" }, "Crossref");
 assert.equal(manual.publicationType, "thesis", "manual type corrections must not be overwritten");

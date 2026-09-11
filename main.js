@@ -362,21 +362,29 @@ function inferPaperTypes(metadata = {}) {
   );
   const title = String(metadata.title || "").normalize("NFKC");
   const venue = String(metadata.venue || metadata.journal || metadata.publisher || "").normalize("NFKC");
-  const source = `${title} ${venue}`.toLocaleLowerCase();
+  const collections = (Array.isArray(metadata.collections) ? metadata.collections : [metadata.collections])
+    .filter(Boolean).join(" ").normalize("NFKC");
+  const tags = (Array.isArray(metadata.tags) ? metadata.tags : [metadata.tags])
+    .filter(Boolean).join(" ").normalize("NFKC");
+  const source = `${title} ${venue} ${collections} ${tags}`.toLocaleLowerCase();
+  const classificationSource = `${title} ${collections} ${tags}`.toLocaleLowerCase();
   let inferredPublicationType = publicationType;
   let inferredContentType = contentType;
   if (!inferredPublicationType) {
     if (/\b(?:ph\.?d\.?|doctoral|master'?s?)\s+(?:dissertation|thesis)\b|博士(?:学位)?论文|硕士(?:学位)?论文|学位论文/i.test(source)) inferredPublicationType = "thesis";
+    else if (/\bpatents?\b|专利/i.test(classificationSource)) inferredPublicationType = "patent";
     else if (/\b(?:arxiv|biorxiv|medrxiv|preprint)\b|预印本/i.test(source) || metadata.arxiv) inferredPublicationType = "preprint";
+    else if (/\b(?:technical report|tech report)\b|技术报告/i.test(classificationSource)) inferredPublicationType = "technical-report";
+    else if (/\bstandards?\b|国家标准|行业标准/i.test(classificationSource)) inferredPublicationType = "standard";
     else if (/\b(?:conference|proceedings|symposium|workshop)\b|会议论文集/i.test(venue)) inferredPublicationType = "conference-paper";
     else if (venue) inferredPublicationType = "journal-article";
   }
   if (!inferredContentType) {
-    if (/\b(?:systematic review|meta[- ]analysis|meta[- ]analytic)\b|系统综述|荟萃分析/i.test(title)) inferredContentType = "systematic-review";
-    else if (/\b(?:review|survey)\b|综述|述评/i.test(title)) inferredContentType = "review";
-    else if (/\b(?:protocol|methodology|methods?)\b|实验方案|研究方案|方法学/i.test(title)) inferredContentType = "methods-protocol";
-    else if (/\b(?:perspective|commentary|editorial|opinion)\b|观点|评论|社论/i.test(title)) inferredContentType = "perspective-commentary";
-    else if (/\b(?:dataset|benchmark|data descriptor|data paper)\b|数据集|基准测试/i.test(title)) inferredContentType = "dataset-benchmark";
+    if (/\b(?:systematic review|meta[- ]analysis|meta[- ]analytic)\b|系统综述|荟萃分析/i.test(classificationSource)) inferredContentType = "systematic-review";
+    else if (/\b(?:review|survey)\b|综述|述评/i.test(classificationSource)) inferredContentType = "review";
+    else if (/\b(?:protocol|methodology|methods?)\b|实验方案|研究方案|方法学/i.test(classificationSource)) inferredContentType = "methods-protocol";
+    else if (/\b(?:perspective|commentary|editorial|opinion)\b|观点|评论|社论/i.test(classificationSource)) inferredContentType = "perspective-commentary";
+    else if (/\b(?:dataset|benchmark|data descriptor|data paper)\b|数据集|基准测试/i.test(classificationSource)) inferredContentType = "dataset-benchmark";
   }
   return { publicationType: inferredPublicationType, contentType: inferredContentType };
 }
