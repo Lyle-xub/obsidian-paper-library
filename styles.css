@@ -3551,6 +3551,30 @@
   box-shadow: none;
 }
 
+.paperlib-type-filters {
+  display: flex;
+  flex: 0 1 auto;
+  gap: 6px;
+  min-width: 0;
+}
+
+.paperlib-type-filter {
+  width: 128px;
+  height: 42px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--paperlib-border);
+  border-radius: var(--paperlib-radius);
+  color: var(--text-muted);
+  background-color: var(--background-primary);
+  font-size: 12px;
+}
+
+.paperlib-type-filter:focus-visible {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--paperlib-accent-soft);
+  outline: none;
+}
+
 .paperlib-list-head {
   display: flex;
   align-items: center;
@@ -3598,7 +3622,7 @@
   display: grid;
   grid-template-columns: var(
     --paperlib-table-columns,
-    38px 40px 220px 86px 520px 104px 240px 300px
+    38px 40px 220px 86px 520px 180px 104px 240px 300px
   );
   grid-auto-flow: column;
   column-gap: 0;
@@ -3984,6 +4008,48 @@ body.paperlib-is-column-resizing {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.paperlib-type,
+.paperlib-type-summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.paperlib-type-summary {
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.paperlib-type-badge,
+.paperlib-pg-type {
+  max-width: 100%;
+  padding: 2px 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--background-modifier-hover);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paperlib-type-badge.is-content {
+  color: var(--text-accent);
+  background: var(--paperlib-accent-soft);
+}
+
+.paperlib-type-empty {
+  color: var(--text-faint);
+}
+
+.paperlib-pg-type {
+  margin-left: 4px;
+  color: inherit;
 }
 
 .paperlib-table-rating {
@@ -7123,6 +7189,7 @@ button.paperlib-file-open {
     z-index: 8;
     top: 0;
     min-height: 58px;
+    flex-wrap: wrap;
     gap: 7px;
     padding: 8px 10px;
     background: color-mix(in srgb, var(--background-primary) 92%, transparent);
@@ -7134,6 +7201,17 @@ button.paperlib-file-open {
     min-width: 0;
     height: 40px;
     padding: 0 10px;
+  }
+
+  .paperlib-type-filters {
+    order: 3;
+    width: 100%;
+  }
+
+  .paperlib-type-filter {
+    width: auto;
+    height: 34px;
+    flex: 1;
   }
 
   .paperlib-mobile-toolbar-actions {
